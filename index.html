@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>补货分析模块</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --line: #e4e7ec;
+    --text: #1f2329; --muted: #6b7280;
+    --red: #d93025; --green: #1a7f37; --orange: #e67e22;
+    --blue: #1d6feb;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; font-size:14px; line-height:1.6; }
+  .wrap { max-width: 980px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:12px; margin-bottom:16px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  .params { display:grid; grid-template-columns:repeat(4,1fr); gap:10px 16px; }
+  .params label { font-size:12px; color:var(--muted); display:block; margin-bottom:2px; }
+  .params input { width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+  textarea { width:100%; min-height:180px; border:1px solid var(--line); border-radius:8px;
+    padding:10px 12px; font-family:ui-monospace,Consolas,monospace; font-size:13px; resize:vertical; }
+  .btns { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  button { padding:8px 16px; border:1px solid var(--line); background:#fff; border-radius:8px;
+    cursor:pointer; font-size:14px; }
+  button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+  button:hover { opacity:.9; }
+  .sku-card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+    margin-bottom:12px; overflow:hidden; }
+  details.sku-card > summary { cursor:pointer; padding:12px 16px; display:flex; align-items:center;
+    gap:10px; flex-wrap:wrap; list-style:none; user-select:none; }
+  details.sku-card > summary::-webkit-details-marker { display:none; }
+  details.sku-card > summary::before { content:"▸"; color:var(--muted); font-size:12px; width:10px; }
+  details.sku-card[open] > summary::before { content:"▾"; }
+  details.sku-card > summary:hover { background:#fafbfc; }
+  details.sku-card[open] > summary { border-bottom:1px solid var(--line); }
+  .sku-body { padding:10px 16px 16px; }
+  .sum-meta { color:var(--muted); font-size:12px; }
+  .tally-bar { background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:10px 16px; margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; }
+  .sku-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+  .sku-title { font-weight:700; font-size:15px; }
+  .badge { padding:2px 10px; border-radius:20px; font-size:12px; font-weight:600; color:#fff; }
+  .badge.green { background:var(--green); }
+  .badge.orange { background:var(--orange); }
+  .badge.red { background:var(--red); }
+  .status-line { color:var(--muted); font-size:13px; margin-bottom:10px; }
+  .warn { color:var(--red); font-size:13px; margin:6px 0; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:10px 0; }
+  th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; }
+  th { background:#fafbfc; font-weight:600; }
+  td.gap { color:var(--red); font-weight:600; }
+  .plan { border-left:3px solid var(--line); padding:8px 12px; margin:10px 0; background:#fafbfc; border-radius:6px; }
+  .plan h4 { margin:0 0 4px; font-size:14px; }
+  .plan .note { color:var(--muted); font-size:12px; margin:4px 0; }
+  .plan .note.risk { color:var(--red); }
+  .plan ol { margin:4px 0; padding-left:18px; }
+  .plan li { font-size:13px; font-family:ui-monospace,Consolas,monospace; }
+  .copy-btn { font-size:12px; padding:3px 10px; margin-left:8px; }
+  .err { color:var(--red); padding:10px; }
+  details.panel summary { cursor:pointer; font-weight:600; font-size:14px; outline:none; }
+  details.panel[open] summary { margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+  .doc h3 { font-size:13px; margin:16px 0 6px; }
+  .doc table { margin:6px 0 10px; }
+  .doc table.def td:first-child { white-space:nowrap; font-weight:600; }
+  .doc table.def td:last-child { color:var(--muted); }
+  .doc .val { color:var(--blue); font-weight:600; }
+  .doc .note { color:var(--orange); font-size:12px; margin:6px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>补货分析模块</h1>
+  <div class="sub">粘贴 SKU 数据 → 点「分析」→ 本地计算输出时间轴 + 两方案，零 AI 调用</div>
+
+  <div class="panel">
+    <div class="params" oninput="renderCalcDoc()" onchange="renderCalcDoc()">
+      <label>补货周期(天)<input id="p-cycle" type="number" value="7"></label>
+      <label>采购提前期(天)<input id="p-lead" type="number" value="2"></label>
+      <label>安全库存(天)<input id="p-safety" type="number" value="2"></label>
+      <label>基准日<input id="p-base" type="date"></label>
+      <label>海运(天,0=不用)<input id="p-sea" type="number" value="0"></label>
+      <label>陆运(天,0=不用)<input id="p-land" type="number" value="0"></label>
+      <label>空运(天,0=不用)<input id="p-air" type="number" value="0"></label>
+    </div>
+  </div>
+
+  <details class="panel doc" id="calc-doc">
+    <summary>计算说明（参数定义 / 计算公式 / 方案逻辑）</summary>
+    <div id="calc-doc-body"></div>
+  </details>
+
+  <div class="panel">
+    <textarea id="input" placeholder="在此粘贴 SKU 数据，多个 SKU 用 ===SKU:编码=== 分隔"></textarea>
+    <div class="btns">
+      <button class="primary" onclick="run()">分析</button>
+      <button onclick="loadSample()">载入示例</button>
+      <button onclick="clearAll()">清空</button>
+    </div>
+  </div>
+
+  <div id="output"></div>
+</div>
+
+<script>
+/* ============================================================
+ * 核心模块 ReplenishModule（可整体复制到你的网站复用）
+ * API:
+ *   parse(text) -> [sku]                解析粘贴文本
+ *   analyze(sku, params, baseDate) -> res  核心计算（可直接传结构化数据对象，绕过 parse）
+ *   planA/B(res, params) -> plan          两方案
+ *   toMarkdown(res, plans) -> string    生成 Markdown
+ * ============================================================ */
+const ReplenishModule = (function () {
+
+  const SEA_DEFAULT = 25;   // 海运填 0（未启用）时方案一仍按此默认值估算（成本基准）
+  const STALE_DAYS = 90;    // 在途超 3 个月未提货 → 列出但忽略不计
+
+  /* ---------- 日期工具 ---------- */
+  function parseDate(s) {
+    if (!s) return null;
+    const m = String(s).match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+  }
+  function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + Math.ceil(n)); return x; }
+  function dayDiff(a, b) { return Math.round((new Date(a) - new Date(b)) / 86400000); }
+  function fmt(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function fmtMD(d) { return String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  const sum = (arr, k) => arr.reduce((s, b) => s + b[k], 0);
+
+  /* ---------- 解析 ---------- */
+  function parse(text) {
+    const skus = [];
+    const parts = String(text).split(/===SKU/i);
+    for (let p of parts) {
+      p = p.replace(/^[：:]\s*\S+\s*=*/, "").trim();
+      if (!p) continue;
+      const sku = parseOne(p);
+      if (sku.code || sku.daily7) skus.push(sku);
+    }
+    return skus;
+  }
+  function parseOne(block) {
+    const sku = { code: "", daily7: 0, daily30: 0, changeRate: 0, available: 0, sellDays: 0, sales7: 0, inTransit: [] };
+    for (const raw of block.split("\n")) {
+      const line = raw.trim();
+      let m;
+      if ((m = line.match(/^SKU\s*[：:]\s*(\S+)/))) sku.code = m[1];
+      else if ((m = line.match(/日均7天\s*[：:]\s*([\d.]+)/))) sku.daily7 = parseFloat(m[1]);
+      else if ((m = line.match(/日均30天\s*[：:]\s*([\d.]+)/))) sku.daily30 = parseFloat(m[1]);
+      else if ((m = line.match(/日均变化率\s*[：:]\s*([+\-]?[\d.]+)/))) sku.changeRate = parseFloat(m[1]);
+      else if ((m = line.match(/可用库存\s*[：:]\s*([\d.]+)/))) sku.available = parseFloat(m[1]);
+      else if ((m = line.match(/可售天数\s*[：:]\s*([\d.]+)/))) sku.sellDays = parseFloat(m[1]);
+      else if ((m = line.match(/销量7天\s*[：:]\s*([\d.]+)/))) sku.sales7 = parseFloat(m[1]);
+      else if ((m = line.match(/^\s*[-*]\s*([^：:\s]+)\s*[：:]\s*在途\s*(\d+)\s*件/))) {
+        const pd = line.match(/采购时间\s*([\d]{4}[-\/]\d{1,2}[-\/]\d{1,2})/);
+        const eta = line.match(/预计到货\s*[≈=~]?\s*([\d]{4}[-\/]\d{1,2}[-\/]\d{1,2})/);
+        const ts = line.match(/运输时效\s*(\d+)/);
+        sku.inTransit.push({ method: m[1], qty: parseInt(m[2]), purchaseDate: pd ? pd[1] : "", eta: eta ? eta[1] : "", transitDays: ts ? parseInt(ts[1]) : 0 });
+      }
+    }
+    if (!sku.daily7 && sku.sales7) sku.daily7 = sku.sales7 / 7;
+    return sku;
+  }
+
+  /* ---------- 核心计算 ---------- */
+  function analyze(sku, params, baseDate) {
+    const d = sku.daily7;
+    if (!d || d <= 0) return { error: "SKU " + (sku.code || "") + " 日均7天缺失或为0，无法计算" };
+    const today = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+
+    const overdue = [], upcoming = [], anomaly = [];
+    for (const b of sku.inTransit) {
+      // 采购超 3 个月仍未提货 → 列出但忽略不计（不进时间轴、不计入方案）
+      const pdDate = parseDate(b.purchaseDate);
+      const age = pdDate ? dayDiff(today, pdDate) : null;
+      if (age !== null && age > STALE_DAYS) {
+        anomaly.push(Object.assign({}, b, { stale: true, reason: "采购 " + fmt(pdDate) + "，已 " + age + " 天未提货（超 3 个月），忽略不计" }));
+        continue;
+      }
+      const eta = parseDate(b.eta);
+      if (!eta) { anomaly.push(Object.assign({}, b, { reason: b.eta ? "预计到货日期格式异常" : "无预计到货日期" })); continue; }
+      if (eta <= today) overdue.push(Object.assign({}, b, { etaDate: eta })); else upcoming.push(Object.assign({}, b, { etaDate: eta }));
+    }
+    upcoming.sort((a, b) => a.etaDate - b.etaDate);
+    overdue.sort((a, b) => (parseDate(a.purchaseDate) || today) - (parseDate(b.purchaseDate) || today));
+    const overdueQty = sum(overdue, "qty");
+
+    const rows = [];
+    let stock = sku.available;
+    const firstUseBy = addDays(today, stock / d);
+    rows.push({ kind: "current", qty: Math.round(stock), arrive: today, useBy: firstUseBy });
+
+    for (const b of overdue) {
+      stock += b.qty;
+      rows.push({ kind: "overdue", method: b.method, qty: b.qty, purchaseDate: b.purchaseDate, arrive: b.etaDate || today, useBy: addDays(today, stock / d) });
+    }
+
+    let curDate = today;
+    for (const b of upcoming) {
+      const days = dayDiff(b.etaDate, curDate);
+      const remaining = stock - d * days;
+      let gap = null;
+      if (remaining < -1e-6) {
+        gap = { from: addDays(curDate, stock / d), to: b.etaDate, missQty: Math.ceil(-remaining) };
+      }
+      const tight = remaining >= -1e-6 && remaining < d;
+      const newStock = Math.max(remaining, 0) + b.qty;
+      rows.push({ kind: "batch", method: b.method, qty: b.qty, purchaseDate: b.purchaseDate, arrive: b.etaDate, useBy: addDays(b.etaDate, newStock / d), gap, tight, stock: Math.round(newStock) });
+      stock = newStock;
+      curDate = b.etaDate;
+    }
+
+    // 末尾库存耗尽：最后一条记录之后无任何到货，自耗尽日起视为开放式断货（无截止日）
+    const endGap = { from: addDays(curDate, stock / d), to: null, missQty: 0, terminal: true };
+    rows[rows.length - 1].endGap = endGap;
+
+    let firstGap = null;
+    for (const r of rows) if (r.gap) { firstGap = r.gap; break; }
+    if (!firstGap) firstGap = endGap;
+
+    let status = "充足", statusNote = "30 天内无断货";
+    if (firstGap) {
+      const dt = dayDiff(firstGap.from, today);
+      if (dt <= 10) { status = "紧急"; statusNote = "距缺货 " + dt + " 天"; }
+      else if (dt <= 30) { status = "注意"; statusNote = "距缺货 " + dt + " 天"; }
+      else { status = "充足"; statusNote = "缺货在 " + dt + " 天后（>30 天）"; }
+    }
+    const trend = Math.abs(sku.changeRate) > 10 ? "日均变化率 " + (sku.changeRate > 0 ? "+" : "") + sku.changeRate + "%，" + (sku.changeRate > 0 ? "涨速需警惕" : "跌速需关注") : "";
+
+    // 提货提醒：可售天数低于补货周期 → 现有库存撑不到下一批，须立即提货/补货
+    const sellDays = sku.available / d;
+    const pickupAlert = sellDays < params.cycle
+      ? "⚠️ 可售 " + (Math.round(sellDays * 10) / 10) + " 天 < 补货周期 " + params.cycle + " 天，需立即提货"
+      : "";
+
+    return { sku, today, d, rows, overdue, overdueQty, anomaly, firstGap, status, statusNote, trend, sellDays, pickupAlert, finalStock: stock, finalDate: curDate };
+  }
+
+  // 方案一主力恒为海运（与是否填写海运无关，未填则取默认 SEA_DEFAULT 天）
+  function seaMethod(p) { return { m: "海运", d: +p.sea > 0 ? +p.sea : SEA_DEFAULT }; }
+  function options(p) { return [{ m: "海运", d: +p.sea }, { m: "陆运", d: +p.land }, { m: "空运", d: +p.air }].filter(x => x.d > 0); }
+  // 方案二快补：从已启用方式中取最快；全部为 0 时回退海运
+  function fastest(p) { const o = options(p); return o.length ? o.reduce((a, b) => a.d < b.d ? a : b) : seaMethod(p); }
+  // 方案二主力：只从已启用方式（d>0）中取最慢，0=不用该方式；全部为 0 时回退海运
+  function enabledSlowest(p) { const o = options(p); return o.length ? o.reduce((a, b) => a.d > b.d ? a : b) : seaMethod(p); }
+  // 单批标准量：覆盖一个补货周期 + 安全库存。稳态滚动下恒定成立，与运输时长无关：
+  // 下一批采购日 = 本批用完日 − safety − (提前期+运输天数) = 今天 + 补货周期（因本批到货日 = 今天+提前期+运输天数）
+  // 即管道由「提前下单」填充，而非靠加大首批量 → 每批只需 d × (补货周期+安全库存)
+  // 至少 1 天量，防止「补货周期 0 + 安全库存 0」算出 0 件导致后续推演失效
+  function batchQty(d, params) { return Math.ceil(d * Math.max(1, params.cycle + params.safety)); }
+  // 衔接批次：期望「上批用完日 − 安全库存」到货；采购日早于今天则钳到今天并顺延到货，标记是否赶不上
+  function chainBatch(prevUseBy, transit, today, params, qty, d) {
+    let arrive = addDays(prevUseBy, -params.safety);
+    let purchase = addDays(arrive, -transit);
+    let lateDays = 0;
+    if (purchase < today) { purchase = today; arrive = addDays(today, transit); lateDays = Math.max(dayDiff(arrive, prevUseBy), 0); }
+    return { purchase, arrive, useBy: addDays(arrive, (params.safety * d + qty) / d), lateDays };
+  }
+  // ④ 阶梯补货（快补也赶不上断点时）：
+  //   今天同时下「最快方式」与「主力慢方式」两单 → 快补按补货周期滚动续接，直到慢方式首批能接上
+  //   → 之后转慢方式滚动担主力。每批都是周期+安全库存量，保证「够一个补货周期」。
+  function ladderLines(res, params, fast, slow) {
+    const d = res.d, stdQty = batchQty(d, params);
+    const fastTransit = params.leadTime + fast.d, slowTransit = params.leadTime + slow.d;
+    const slowArrive1 = addDays(res.today, slowTransit);
+    const lines = [];
+
+    // 快补第 1 单：今天下单，最早到货。到货时若仍在断货期内则库存为 0（不能按 safety 天乐观估算，否则会少排一单）
+    const fastArrive1 = addDays(res.today, fastTransit);
+    const carry1 = fastArrive1 > res.firstGap.from ? 0 : params.safety * d;
+    let fU = addDays(fastArrive1, (carry1 + stdQty) / d);
+    lines.push({ purchase: res.today, method: fast.m, qty: stdQty, arrive: fastArrive1, useBy: fU });
+
+    // 快补滚动续接：直到「慢方式首批到货日 ≤ 快补用完日 − 安全库存」即衔接成功
+    let guard = 0;
+    while (dayDiff(fU, slowArrive1) < params.safety && guard++ < 8) {
+      const c = chainBatch(fU, fastTransit, res.today, params, stdQty, d);
+      lines.push({ purchase: c.purchase, method: fast.m, qty: stdQty, arrive: c.arrive, useBy: c.useBy });
+      if (dayDiff(c.useBy, fU) <= 0) break;   // 无法推进则停止，防死循环
+      fU = c.useBy;
+    }
+    // 快补批次用尽仍未接上 → 标记，由 planB 给出警示（避免输出看似完整实则断档的方案）
+    const linked = dayDiff(fU, slowArrive1) >= params.safety;
+
+    // 慢方式首批：到货时快补可能仍有余量，取「实际余量」与「安全库存」的较大值，避免低估可用天数
+    const carryS = Math.max(d * Math.max(dayDiff(fU, slowArrive1), 0), params.safety * d);
+    let sU = addDays(slowArrive1, (carryS + stdQty) / d);
+    lines.push({ purchase: res.today, method: slow.m, qty: stdQty, arrive: slowArrive1, useBy: sU });
+    for (let i = 0; i < 2; i++) {
+      const c = chainBatch(sU, slowTransit, res.today, params, stdQty, d);
+      lines.push({ purchase: c.purchase, method: slow.m, qty: stdQty, arrive: c.arrive, useBy: c.useBy });
+      sU = c.useBy;
+    }
+    lines.linked = linked;
+    return lines;
+  }
+
+  // 重订货点：沿时间轴找「现有+到货库存」可覆盖天数首次降到 (提前期+安全+运输) 的日期，作为首批采购日
+  // 不提前占款；若今天已≤阈值则今天采
+  function computeReorderDate(res, params, slow) {
+    const d = res.d;
+    const reorderQty = d * (params.leadTime + params.safety + slow.d);
+    const arriveQty = {};
+    for (const r of res.rows) {
+      if (r.kind === "current") continue;
+      const t = +r.arrive;
+      arriveQty[t] = (arriveQty[t] || 0) + r.qty;
+    }
+    const events = Object.keys(arriveQty).map(Number).sort((a, b) => a - b);
+    let stock = res.sku.available, cur = res.today;
+    if (stock <= reorderQty) return res.today;
+    for (const ev of events) {
+      const segDays = dayDiff(ev, cur);
+      const atStart = stock - d * segDays;
+      if (atStart <= reorderQty) return addDays(cur, Math.ceil((stock - reorderQty) / d));
+      stock = atStart + arriveQty[ev];
+      cur = new Date(ev);
+    }
+    return addDays(cur, Math.ceil((stock - reorderQty) / d));
+  }
+
+  // mainMethod 默认海运（方案一恒为海运基准）；方案二传入 enabledSlowest，避免输出未启用的方式
+  function planA(res, params, mainMethod, firstPurchase) {
+    const d = res.d, slow = mainMethod || seaMethod(params);
+    // 滚动补货口径：每批等量 = 补货周期 + 安全库存；不预扣现有库存（由时间轴自然消耗）
+    const q1 = batchQty(d, params);
+    const q2 = q1, q3 = q1;
+    const transit = params.leadTime + slow.d;
+
+    // 批次衔接留安全库存：下一批在"上批用完日 − 安全库存天数"到货，到货时仍剩安全库存量
+    const p1 = firstPurchase || res.today, a1 = addDays(p1, transit);
+    // 首批到货时的剩余库存：复用时间轴，累加在途到 a1 的到货量后消耗到 a1
+    let stockAtA1 = res.sku.available + res.overdueQty, cursor = res.today;
+    for (const r of res.rows) {
+      if (r.kind !== "batch") continue;
+      if (r.arrive > a1) break;
+      stockAtA1 = Math.max(stockAtA1 - d * dayDiff(r.arrive, cursor), 0) + r.qty;
+      cursor = r.arrive;
+    }
+    stockAtA1 = Math.max(stockAtA1 - d * dayDiff(a1, cursor), 0);
+    const u1 = addDays(a1, (stockAtA1 + q1) / d);
+    const c2 = chainBatch(u1, transit, res.today, params, q2, d);
+    const c3 = chainBatch(c2.useBy, transit, res.today, params, q3, d);
+
+    // 首批最迟采购日：保证首批在库存耗尽前到货
+    const exhaust = res.firstGap ? res.firstGap.from : res.rows[res.rows.length - 1].useBy;
+    const latestP1 = addDays(exhaust, -transit);
+
+    // 缓冲天数 = 断点 − 首批到货日：负数=到货前已断货，0=贴线，正数=安全
+    const buf = dayDiff(res.firstGap.from, a1);
+    let risk;
+    if (buf < 0) risk = "首批 " + fmtMD(a1) + " 到货前即断货（断点 " + fmtMD(res.firstGap.from) + "），纯" + slow.m + "不可行，需提前采购或加快";
+    else if (buf < 1) risk = "首批贴线到货，决策窗口短";
+    else risk = "首批到货前不断货（缓冲 " + buf + " 天）";
+    const lateParts = [];
+    if (c2.lateDays > 0) lateParts.push("第2批断货 " + c2.lateDays + " 天");
+    if (c3.lateDays > 0) lateParts.push("第3批断货 " + c3.lateDays + " 天");
+    if (lateParts.length) risk += "；" + lateParts.join("，") + "，需加大批量或改用更快渠道";
+    const latest = latestP1 < res.today ? "最迟采购节点已过，须立即下单" : "首批最迟采购日 " + fmtMD(latestP1);
+
+    const seaNote = +params.sea > 0 ? "" : "海运未填写（0），按默认 " + SEA_DEFAULT + " 天估算；";
+    return { title: "方案一（纯" + slow.m + "·分批）", note: seaNote + "全程只用" + slow.m + "分批补货，每批 " + q1 + " 件（补货周期+安全库存），每 " + params.cycle + " 天滚动一单；" + latest, risk,
+      lines: [{ purchase: p1, method: slow.m, qty: q1, arrive: a1, useBy: u1 },
+        { purchase: c2.purchase, method: slow.m, qty: q2, arrive: c2.arrive, useBy: c2.useBy },
+        { purchase: c3.purchase, method: slow.m, qty: q3, arrive: c3.arrive, useBy: c3.useBy }] };
+  }
+
+  function planB(res, params) {
+    const d = res.d, slow = enabledSlowest(params), fast = fastest(params);
+    const fastMin = batchQty(d, params);   // 快补起采下限，避免高频小单
+    const noMethod = options(params).length === 0
+      ? "未填写任何运输方式，按海运 " + SEA_DEFAULT + " 天默认估算；" : "";
+    const slowTransit = params.leadTime + slow.d;
+    const slowArrive = addDays(res.today, slowTransit);
+    // 在途能否撑到主力方式首批到货，且到货时仍留有安全库存（贴线不算充足）
+    const canSustain = !res.firstGap || res.firstGap.from >= addDays(slowArrive, params.safety);
+
+    // 重订货点：首批延后到「现有+到货库存可覆盖天数降至(提前期+安全+运输)」时再采，不提前占款
+    const exhaust = res.firstGap ? res.firstGap.from : res.rows[res.rows.length - 1].useBy;
+    const latestP1 = addDays(exhaust, -slowTransit);
+    let firstPurchase = computeReorderDate(res, params, slow);
+    let deferredNote = "";
+    if (firstPurchase > latestP1) { firstPurchase = latestP1; deferredNote = "（重订货点晚于最迟采购日，已提前至 " + fmtMD(firstPurchase) + " 以确保不断货）"; }
+    else if (firstPurchase > res.today) deferredNote = "（首批延后至 " + fmtMD(firstPurchase) + " 采购·重订货点）";
+    if (firstPurchase < res.today) firstPurchase = res.today;
+
+    if (canSustain) {
+      const a = planA(res, params, slow, firstPurchase);
+      return { title: "方案二（组合·推荐）", note: noMethod + "在途充足，直接" + slow.m + "分批" + deferredNote, risk: a.risk, lines: a.lines };
+    }
+    const gapFrom = res.firstGap.from;
+    const a = planA(res, params, slow, firstPurchase);
+
+    // 今天下单最快物流能否赶上断点
+    const fastArrive = addDays(res.today, params.leadTime + fast.d);
+
+    // 快补与主力同为一条渠道（如纯空运）→ 角色退化，不重复出快补单，直接按主力方式分批
+    if (slow.m === fast.m) {
+      const risk = fastArrive > gapFrom
+        ? "预计断货 " + fmtMD(gapFrom) + "→" + fmtMD(fastArrive) + "，缺货约 " + Math.ceil(d * dayDiff(fastArrive, gapFrom)) + " 件；建议立即催提在途或加价更快渠道"
+        : a.risk;
+      return { title: "方案二（组合·推荐）", note: noMethod + "仅" + slow.m + "一种方式可用，快补与主力同渠道，直接按" + slow.m + "分批", risk, lines: a.lines };
+    }
+
+    // ④ 快补也赶不上：阶梯补货 —— 今天同时下快补 + 慢方式，快补滚动续接至慢方式接手，之后慢方式为主
+    if (fastArrive > gapFrom) {
+      const stockoutQty = Math.ceil(d * dayDiff(fastArrive, gapFrom));
+      const lines = ladderLines(res, params, fast, slow);
+      const nFast = lines.filter(l => l.method === fast.m).length;
+      const unlinked = lines.linked === false
+        ? "；⚠️ 快补批次数已达上限（8 批）仍未接上" + slow.m + "，方案可能残留断档，建议加大单批量或启用" + (params.land > 0 && slow.m !== "陆运" ? "陆运等" : "") + "中间渠道" : "";
+      return { title: "方案二（组合·推荐）",
+        note: "断点太近，" + fast.m + "今天下单也赶不上：今日同时下「" + fast.m + "」与「" + slow.m + "」两单，"
+          + fast.m + "每批 " + batchQty(d, params) + " 件（够一个补货周期）滚动续接共 " + nFast + " 批（"
+          + (nFast * batchQty(d, params)) + " 件，成本较高），直至" + slow.m + "首批到货接手，之后转" + slow.m + "滚动担主力",
+        risk: "预计断货 " + fmtMD(gapFrom) + "→" + fmtMD(fastArrive) + "，缺货约 " + stockoutQty + " 件；建议立即催提在途或加价更快渠道" + unlinked,
+        lines };
+    }
+
+    const missQty = Math.max(Math.ceil(d * dayDiff(slowArrive, gapFrom)), fastMin);
+    const pFast = addDays(gapFrom, -(params.leadTime + fast.d));
+    const aFast = addDays(pFast, params.leadTime + fast.d);
+    const uFast = addDays(aFast, missQty / d);
+    return { title: "方案二（组合·推荐）", note: "在途撑不到" + slow.m + "到货，" + fast.m + "补缺口，" + slow.m + "担主力", risk: "",
+      lines: [{ purchase: pFast, method: fast.m, qty: missQty, arrive: aFast, useBy: uFast }].concat(a.lines) };
+  }
+
+  /* ---------- Markdown ---------- */
+  function toMarkdown(res, plans, params) {
+    const d = res.d;
+    let md = "===SKU:" + (res.sku.code || "未命名") + "===\n\n";
+    md += "**库存状态**：" + res.status + "（" + res.statusNote + "）";
+    if (res.trend) md += "；" + res.trend;
+    md += "\n\n";
+    md += "日均30天 " + res.sku.daily30 + " ｜ 日均7天 " + res.sku.daily7 + " ｜ 日均变化率 " + (res.sku.changeRate > 0 ? "+" : "") + res.sku.changeRate + "%\n\n";
+    if (res.pickupAlert) {
+      md += res.pickupAlert + (res.overdue.length ? "（存在逾期批次，优先催提）" : "") + "\n\n";
+    }
+    md += "**库存时间轴**：\n";
+    md += "| 采购 | 方式 | 数量 | 预计到货 | 预计用完 |\n|---|---|---|---|---|\n";
+    md += "| — | — | 当前库存 " + res.rows[0].qty + " 件 | — | " + fmtMD(res.rows[0].useBy) + " |\n";
+    for (let i = 1; i < res.rows.length; i++) {
+      const r = res.rows[i];
+      const pd = r.purchaseDate ? fmtMD(parseDate(r.purchaseDate)) : "—";
+      let arrive;
+      if (r.kind === "overdue") arrive = fmtMD(r.arrive) + " (逾期未提货)";
+      else if (r.tight) arrive = fmtMD(r.arrive) + " ⚠️贴线";
+      else arrive = fmtMD(r.arrive);
+      const gap = r.gap ? " 🔴断货 " + fmtMD(r.gap.from) + "→" + fmtMD(r.gap.to) + " 缺 " + r.gap.missQty + " 件" : "";
+      const endM = r.endGap ? " 🔴断货 " + fmtMD(r.endGap.from) + " 起（无后续到货）" : "";
+      md += "| " + pd + " | " + r.method + " | " + r.qty + " | " + arrive + " | " + fmtMD(r.useBy) + gap + endM + " |\n";
+    }
+    if (res.anomaly.length) {
+      md += "\n⚠️ 以下在途批次未纳入计算：\n";
+      for (const a of res.anomaly) md += "  - " + (a.method || "未知方式") + " " + a.qty + " 件（" + a.reason + "）\n";
+    }
+    md += "\n**采购方案**：\n";
+    for (const p of plans) {
+      md += "\n- **" + p.title + "**：" + p.note + (p.risk ? "（" + p.risk + "）" : "") + "\n";
+      for (const l of p.lines) md += "  - " + fmtMD(l.purchase) + "采购，" + l.method + l.qty + "件，预计到货" + fmtMD(l.arrive) + "，预计用完 " + fmtMD(l.useBy) + "\n";
+    }
+    return md;
+  }
+
+  return { parse, analyze, planA, planB, toMarkdown, fmt, fmtMD, parseDate };
+})();
+
+/* ============================================================
+ * UI 层（仅测试用，接入网站时只保留上面模块即可）
+ * ============================================================ */
+function getParams() {
+  return {
+    cycle: +document.getElementById("p-cycle").value,
+    leadTime: +document.getElementById("p-lead").value,
+    safety: +document.getElementById("p-safety").value,
+    sea: +document.getElementById("p-sea").value,
+    land: +document.getElementById("p-land").value,
+    air: +document.getElementById("p-air").value,
+  };
+}
+function getBaseDate() {
+  const v = document.getElementById("p-base").value;
+  return v ? new Date(v) : new Date();
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+/* 计算说明面板：参数定义 / 公式 / 方案逻辑，数值随填写值实时变化 */
+function renderCalcDoc() {
+  const p = getParams();
+  const base = document.getElementById("p-base").value || "今天";
+  const V = s => '<span class="val">' + s + "</span>";
+  const tbl = (head, rows) => '<table class="def"><tr>' + head.map(t => "<th>" + t + "</th>").join("")
+    + "</tr>" + rows.map(r => "<tr>" + r.map(c => "<td>" + c + "</td>").join("") + "</tr>").join("") + "</table>";
+  const mth = (d, extra) => d > 0 ? V(d + " 天") : V("0") + "（未启用" + (extra || "") + "）";
+
+  let h = "<h3>一、参数定义</h3>";
+  h += tbl(["参数", "当前值", "说明"], [
+    ["基准日", V(base), "一切日期起算点；最早采购日 = 基准日，输出中不出现过去日期"],
+    ["补货周期", V(p.cycle + " 天"), "滚动下单间隔；同时是单批覆盖天数的基准"],
+    ["采购提前期", V(p.leadTime + " 天"), "下单 → 供应商发货的准备时间"],
+    ["安全库存", V(p.safety + " 天"), "每批到货时应保留的库存天数（缓冲）"],
+    ["海运", mth(p.sea, "；方案一仍按默认 25 天估算"), "0 = 本次不用该方式"],
+    ["陆运", mth(p.land), "0 = 本次不用该方式"],
+    ["空运", mth(p.air), "0 = 本次不用该方式"],
+  ]);
+  h += '<div class="note">三种运输方式默认为 0（未启用），需手动填写实际天数。填 0 = 该渠道本次不参与方案二；但<b>方案一恒按海运 25 天</b>作为成本基准（即使海运填 0）。</div>';
+  h += '<div class="note">⚠️ 安全库存口径：当前为固定 ' + p.safety + ' 天缓冲，未计入销量波动与运输延误分布。若日销波动大，建议按 Z × σ × √(提前期+运输天数) 估算后回填本参数（待优化）。</div>';
+
+  h += "<h3>二、输入字段定义</h3>";
+  h += tbl(["输入字段", "含义", "说明"], [
+    ["日均7天 d", "统一消耗口径", "缺失时用「销量7天 ÷ 7」推导"],
+    ["可用库存", "当前可售库存", "时间轴起点"],
+    ["在途批次", "已采购未到货", "必须有「预计到货」且为 YYYY-MM-DD 才纳入计算"],
+    ["日均变化率", "日均7天 vs 日均30天", "绝对值 > 10% 时输出趋势提示，不参与计算"],
+  ]);
+
+  h += "<h3>三、计算公式</h3>";
+  h += tbl(["计算项", "公式", "说明"], [
+    ["可售天数", "可用库存 ÷ d", "低于补货周期 → 红字「需立即提货」"],
+    ["单批采购量", "⌈d × (补货周期 + 安全库存)⌉ = ⌈d × " + (p.cycle + p.safety) + "⌉", "三批等量；与运输时长无关（管道靠提前下单填充）"],
+    ["到货日", "采购日 + 提前期 + 运输天数", "—"],
+    ["预计用完（当前库存行）", "基准日 + 可用库存 ÷ d", "—"],
+    ["预计用完（批次行）", "到货日 + 到货后库存 ÷ d", "到货后库存 = max(到货时剩余, 0) + 本批数量"],
+    ["断货判定", "本行用完日 < 下一行到货日", "或时间轴末尾耗尽后无任何到货（开放式断货）"],
+    ["缺货件数", "⌈d × 断货天数⌉", "断货期损失的销量（机会成本），不计入库存消耗、不从后续库存扣减"],
+    ["贴线到货", "到货时剩余 < 1 天用量", "红字「⚠️贴线」"],
+    ["库存状态", "30 天内无断货 = 充足；距缺货 ≤10 天 = 紧急；10–30 天 = 注意", "以时间轴推算为准"],
+    ["超期在途", "采购 > 90 天仍未提货", "底部红字列出，忽略不计"],
+    ["异常批次", "无预计到货 / 日期非 YYYY-MM-DD", "底部红字列出，不参与计算"],
+  ]);
+
+  h += "<h3>四、方案逻辑</h3>";
+  h += "<table><tr><td style=\"width:26%;font-weight:600\">方案一（纯海运·分批）<br><span style=\"font-weight:400;color:var(--muted)\">成本基准</span></td><td>"
+    + "主力<b>恒为海运</b>（海运填 0 时按默认 25 天估算）。<b>三批等量</b>：每批都是 ⌈d × " + (p.cycle + p.safety) + "⌉，第 1 批基准日下单，之后每 "
+    + p.cycle + " 天滚动一单。<br>紧急场景下首批到货通常晚于断点，方案一会明确标注「不可行」——<b>它是成本参照，不是可执行方案</b>。</td></tr>"
+    + "<tr><td style=\"font-weight:600\">方案二（组合·推荐）<br><span style=\"font-weight:400;color:var(--muted)\">可执行</span></td><td>"
+    + "主力 = 已启用方式中<b>最慢</b>者；快补 = 已启用方式中<b>最快</b>者（均为 0 时回退海运 25 天）。<br><b>首批延后到重订货点</b>：当「现有+到货库存」可覆盖天数降至（提前期+安全+运输）时再下单，不提前占款；已≤阈值或遇紧急缺口则今天下单。四个分支：<br>"
+    + "① 在途能撑到「主力到货 + 安全库存」→ 直接主力分批；<br>"
+    + "② 快补与主力同渠道（如只填了空运）→ 角色退化，直接主力分批；<br>"
+    + "③ 快补能赶上断点 → 快补补「撑到主力到货」的缺口（≥ 一个补货周期量），主力担后续；<br>"
+    + "④ 快补也赶不上 → <b>阶梯补货</b>：今日同时下「快补」与「主力慢方式」两单，快补每批一个补货周期量、滚动续接，"
+    + "直到主力首批到货接手，之后转主力滚动担主力；同时给出断货区间 + 缺货件数预警。</td></tr></table>";
+  h += '<div class="note">批次衔接固定留安全库存（下一批到货日 = 上批用完日 − ' + p.safety + ' 天），因此单批量无需再叠加运输时长。</div>';
+
+  h += "<h3>五、为什么三批等量？</h3>";
+  h += "<table><tr><td>稳态滚动模型下，<b>管道库存靠「提前下单」填充，而不是靠加大首批量</b>。证明：<br>"
+    + "第 n 批到货日 = 基准日 + (提前期 + 运输天数) + (n−1) × 周期跨度<br>"
+    + "第 n 批采购日 = 到货日 − (提前期 + 运输天数) = 基准日 + (n−1) × 周期跨度<br>"
+    + "→ 第 2 批采购日恰为「基准日 + 1 个周期跨度」，<b>与运输时长无关</b>。所以首批量加大并不能让首批更早到货，"
+    + "每批只需覆盖一个补货周期 + 安全库存即可。<br>"
+    + "若按「每批都买运输全程的量」，等于把管道重复填满三次，资金占用翻数倍（本例 2154 件 → 720 件）。</td></tr></table>";
+
+  document.getElementById("calc-doc-body").innerHTML = h;
+}
+
+function run() {
+  const out = document.getElementById("output");
+  const params = getParams();
+  const base = getBaseDate();
+  const text = document.getElementById("input").value;
+  renderCalcDoc();
+  const skus = ReplenishModule.parse(text);
+  if (!skus.length) { out.innerHTML = '<div class="err">未识别到 SKU 数据，请检查输入格式。</div>'; return; }
+
+  const tally = { 紧急: 0, 注意: 0, 充足: 0 };
+  let html = "";
+  for (const sku of skus) {
+    const res = ReplenishModule.analyze(sku, params, base);
+    if (res.error) { html += '<div class="sku-card"><div class="err">' + esc(res.error) + "</div></div>"; continue; }
+    const plans = [ReplenishModule.planA(res, params), ReplenishModule.planB(res, params)];
+    const md = ReplenishModule.toMarkdown(res, plans, params);
+    const badge = res.status === "充足" ? "green" : res.status === "注意" ? "orange" : "red";
+    tally[res.status] = (tally[res.status] || 0) + 1;
+
+    // 默认收起，点击标题展开/收起
+    html += '<details class="sku-card">';
+    html += '<summary><span class="sku-title">' + esc(sku.code || "未命名") + '</span><span class="badge ' + badge + '">' + res.status + "</span>";
+    html += '<span class="sum-meta">' + esc(res.statusNote) + " ｜ 日均7天 " + sku.daily7 + " ｜ 可用 " + res.rows[0].qty + " 件" + (res.pickupAlert ? " ｜ 需提货" : "") + "</span>";
+    html += '<button class="copy-btn" data-md="' + esc(md.replace(/\n/g, "\\n")) + '" onclick="event.stopPropagation();event.preventDefault();copyMd(this)">复制 Markdown</button></summary>';
+    html += '<div class="sku-body">';
+    html += '<div class="status-line">SKU: ' + esc(sku.code || "未命名") + " ｜ " + esc(res.statusNote) + (res.trend ? "；" + esc(res.trend) : "") + "</div>";
+    html += '<div class="status-line">日均30天 ' + sku.daily30 + ' ｜ 日均7天 ' + sku.daily7 + ' ｜ 日均变化率 ' + (sku.changeRate > 0 ? "+" : "") + sku.changeRate + "%</div>";
+
+    if (res.pickupAlert) {
+      html += '<div class="warn">' + esc(res.pickupAlert) + (res.overdue.length ? "（存在逾期批次，优先催提）" : "") + "</div>";
+    }
+
+    html += "<table><tr><th>采购</th><th>方式</th><th>数量</th><th>预计到货</th><th>预计用完</th></tr>";
+    html += "<tr><td>—</td><td>—</td><td>当前库存 " + res.rows[0].qty + " 件</td><td>—</td><td>" + ReplenishModule.fmtMD(res.rows[0].useBy) + "</td></tr>";
+    for (let i = 1; i < res.rows.length; i++) {
+      const r = res.rows[i];
+      const pd = r.purchaseDate ? ReplenishModule.fmtMD(ReplenishModule.parseDate(r.purchaseDate)) : "—";
+      let arrive;
+      if (r.kind === "overdue") arrive = '<td>' + ReplenishModule.fmtMD(r.arrive) + ' <span style="color:var(--red)">(逾期未提货)</span></td>';
+      else if (r.tight) arrive = '<td class="gap">' + ReplenishModule.fmtMD(r.arrive) + " ⚠️贴线</td>";
+      else arrive = "<td>" + ReplenishModule.fmtMD(r.arrive) + "</td>";
+      const useByStr = ReplenishModule.fmtMD(r.useBy);
+      const gapMark = r.gap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(r.gap.from) + "→" + ReplenishModule.fmtMD(r.gap.to) + " 缺 " + r.gap.missQty + " 件</span>" : "";
+      const endMark = r.endGap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(r.endGap.from) + " 起（无后续到货）</span>" : "";
+      html += "<tr><td>" + pd + "</td><td>" + esc(r.method) + "</td><td>" + r.qty + "</td>" + arrive + "<td>" + useByStr + gapMark + endMark + "</td></tr>";
+    }
+    html += "</table>";
+    if (res.anomaly.length) {
+      html += '<div class="warn">⚠️ 以下 ' + res.anomaly.length + ' 批在途未纳入计算：</div><ul style="color:#d93025;font-size:13px;margin:2px 0 0 18px;padding:0">';
+      for (const a of res.anomaly) html += "<li>" + esc(a.method || "未知方式") + " " + a.qty + " 件（" + esc(a.reason) + "）</li>";
+      html += "</ul>";
+    }
+
+    for (const p of plans) {
+      html += '<div class="plan"><h4>' + esc(p.title) + "</h4>";
+      html += '<div class="note">' + esc(p.note) + "</div>";
+      if (p.risk) html += '<div class="note risk">' + esc(p.risk) + "</div>";
+      if (p.lines.length) {
+        html += "<ol>";
+        for (const l of p.lines) html += "<li>" + ReplenishModule.fmtMD(l.purchase) + "采购，" + esc(l.method) + l.qty + "件，预计到货" + ReplenishModule.fmtMD(l.arrive) + "，预计用完 " + ReplenishModule.fmtMD(l.useBy) + "</li>";
+        html += "</ol>";
+      }
+      html += "</div>";
+    }
+    html += "</div></details>";
+  }
+
+  const bar = '<div class="tally-bar">共 ' + skus.length + " 个 SKU："
+    + '<span class="badge red">紧急 ' + (tally.紧急 || 0) + "</span> "
+    + '<span class="badge orange">注意 ' + (tally.注意 || 0) + "</span> "
+    + '<span class="badge green">充足 ' + (tally.充足 || 0) + "</span>"
+    + '<button class="copy-btn" onclick="toggleAll(true)">全部展开</button>'
+    + '<button class="copy-btn" onclick="toggleAll(false)">全部收起</button></div>';
+  out.innerHTML = bar + html;
+}
+
+function toggleAll(open) {
+  document.querySelectorAll("#output details.sku-card").forEach(d => { d.open = open; });
+}
+
+function copyMd(btn) {
+  const md = btn.getAttribute("data-md").replace(/\\n/g, "\n");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(md).then(() => { btn.textContent = "已复制"; setTimeout(() => btn.textContent = "复制 Markdown", 1500); });
+  } else {
+    const ta = document.createElement("textarea"); ta.value = md; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); document.body.removeChild(ta); btn.textContent = "已复制";
+  }
+}
+
+function loadSample() {
+  const t = new Date();
+  const f = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const off = n => { const x = new Date(t); x.setDate(x.getDate() + n); return f(x); };
+  document.getElementById("input").value = [
+    "===SKU:DEMO-SKU-A===",
+    "SKU: DEMO-SKU-A",
+    "销量30天: 767", "销量7天: 186", "日均30天: 25.57", "日均7天: 26.57", "日均变化率: +3.9%",
+    "在仓库库存: 171", "待发货库存: 40", "可用库存: 131", "可售天数: 4",
+    "在途库存: 84",
+    "在途明细（按采购单/批次逐单列出，预计到货=采购时间+运输时效）：",
+    "- 绿色通道: 在途 6 件（采购时间 " + off(-663) + "，运输时效 0 天）",
+    "- 空运: 在途 78 件（采购时间 " + off(-4) + "，运输时效 7 天，预计到货≈" + off(3) + "）",
+    "",
+    "===SKU:DEMO-001===",
+    "SKU: DEMO-001",
+    "销量30天: 9000", "销量7天: 2100", "日均30天: 300", "日均7天: 300", "日均变化率: +8%",
+    "在仓库库存: 600", "待发货库存: 0", "可用库存: 3000", "可售天数: 10",
+    "在途库存: 2400",
+    "在途明细（按采购单/批次逐单列出，预计到货=采购时间+运输时效）：",
+    "- 陆运: 在途 900 件（采购时间 " + off(-5) + "，运输时效 8 天，预计到货≈" + off(3) + "）",
+    "- 海运: 在途 1500 件（采购时间 " + off(-1) + "，运输时效 26 天，预计到货≈" + off(25) + "）",
+  ].join("\n");
+  run();
+}
+function clearAll() { document.getElementById("input").value = ""; document.getElementById("output").innerHTML = ""; }
+
+/* 基准日默认今天 */
+document.getElementById("p-base").value = new Date().toISOString().slice(0, 10);
+document.getElementById("p-base").addEventListener("change", renderCalcDoc);
+renderCalcDoc();
+</script>
+</body>
+</html>
