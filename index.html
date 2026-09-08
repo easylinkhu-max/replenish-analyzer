@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="zh-CN" data-page-node-id="eefrpHZQrhv8jyQ59yU6yH">
+<head data-page-node-id="Q3aulFeAqObCCpfLxNbGC6">
+<meta charset="UTF-8" data-page-node-id="EdDKrc5q0GlHVweDTYFxBz">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="4P0VQkxWBUJ47f99TmQECA">
 <title>补货分析模块</title>
 <style>
   :root {
@@ -69,40 +69,44 @@
   .doc table.def td:last-child { color:var(--muted); }
   .doc .val { color:var(--blue); font-weight:600; }
   .doc .note { color:var(--orange); font-size:12px; margin:6px 0; }
+  /* hover 浮动注释 */
+  .tip { border-bottom:1px dotted var(--muted); cursor:help; }
+  .tipbox { position:fixed; z-index:9999; max-width:340px; background:#1f2329; color:#fff;
+    font-size:12px; line-height:1.55; padding:8px 10px; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.22); pointer-events:none; }
 </style>
 </head>
-<body>
-<div class="wrap">
-  <h1>补货分析模块</h1>
-  <div class="sub">粘贴 SKU 数据 → 点「分析」→ 本地计算输出时间轴 + 两方案，零 AI 调用</div>
+<body data-page-node-id="kB9duiHPxTMY9ronu84iuf">
+<div class="wrap" data-page-node-id="D5BO0NMeiDA7ae892aEU4g">
+  <h1 data-page-node-id="YuuHRAZjW5J1qHSCl9mVCK">补货分析模块</h1>
+  <div class="sub" data-page-node-id="RzNN1Dia6H6R0imiSYuIes">粘贴 SKU 数据 → 点「分析」→ 本地计算输出时间轴 + 三方案，零 AI 调用</div>
 
-  <div class="panel">
-    <div class="params" oninput="renderCalcDoc()" onchange="renderCalcDoc()">
-      <label>补货周期(天)<input id="p-cycle" type="number" value="7"></label>
-      <label>采购提前期(天)<input id="p-lead" type="number" value="2"></label>
-      <label>安全库存(天)<input id="p-safety" type="number" value="2"></label>
-      <label>基准日<input id="p-base" type="date"></label>
-      <label>海运(天,0=不用)<input id="p-sea" type="number" value="0"></label>
-      <label>陆运(天,0=不用)<input id="p-land" type="number" value="0"></label>
-      <label>空运(天,0=不用)<input id="p-air" type="number" value="0"></label>
+  <div class="panel" data-page-node-id="DF2gZwwtz4OjTap4lOH2At">
+    <div class="params" oninput="renderCalcDoc()" onchange="renderCalcDoc()" data-page-node-id="k2AeUAvl2n1VfXiqvpFRj4">
+      <label data-page-node-id="4PPQ9Mv1fzR8SoVX6qULgO">补货周期(天)<input id="p-cycle" type="number" value="7" data-page-node-id="v6CD34ChavPwaQf8BxILpG"></label>
+      <label data-page-node-id="WwFJWL6JOOe9NT3U9JhvQZ">采购提前期(天)<input id="p-lead" type="number" value="2" data-page-node-id="A2KMvz3bqDIgj95suH3Cyk"></label>
+      <label data-page-node-id="gD5V8DGfhHDOnChKvRQYcJ">安全库存(天)<input id="p-safety" type="number" value="2" data-page-node-id="Bd0B8PsDSlShFhTuC0Pqiq"></label>
+      <label data-page-node-id="AATQ2LDqg5YdTx7ieCU3l7">基准日<input id="p-base" type="date" data-page-node-id="P6Oplh4yumYAUNRSjKX3Am"></label>
+      <label data-page-node-id="TZefHGsqaxCtxwWsxAD0S2">海运(天·默认25)<input id="p-sea" type="number" value="25" data-page-node-id="py5b5yvoseIKYqYuFHBze2"></label>
+      <label data-page-node-id="Am17WvIPucI0yD8EYWEtvN">陆运(天·默认7)<input id="p-land" type="number" value="7" data-page-node-id="3tdAdjC4qWNoDBcETeetR0"></label>
+      <label data-page-node-id="DaeQ16Z5zUjHHqtkgGbFyr">空运(天·默认5)<input id="p-air" type="number" value="5" data-page-node-id="PGY8u8tJKqhW2sF3Jo4vtj"></label>
     </div>
   </div>
 
-  <details class="panel doc" id="calc-doc">
-    <summary>计算说明（参数定义 / 计算公式 / 方案逻辑）</summary>
-    <div id="calc-doc-body"></div>
+  <details class="panel doc" id="calc-doc" data-page-node-id="HOdmzd20ZMTW28II2IOiB4">
+    <summary data-page-node-id="yHvKwCkI1uVopZYMXsgFPu">计算说明（参数定义 / 计算公式 / 方案逻辑）</summary>
+    <div id="calc-doc-body" data-page-node-id="a6jXPcYlDx7jBTfd19pAPV"></div>
   </details>
 
-  <div class="panel">
+  <div class="panel" data-page-node-id="dfH0PQrb13oTZ0jORZIlf7">
     <textarea id="input" placeholder="在此粘贴 SKU 数据，多个 SKU 用 ===SKU:编码=== 分隔"></textarea>
-    <div class="btns">
-      <button class="primary" onclick="run()">分析</button>
-      <button onclick="loadSample()">载入示例</button>
-      <button onclick="clearAll()">清空</button>
+    <div class="btns" data-page-node-id="6wG3cHMF5EqmDYu4TmQkFc">
+      <button class="primary" onclick="run()" data-page-node-id="QorOmqLyCFZTeQZ1sXjPi9">分析</button>
+      <button onclick="loadSample()" data-page-node-id="RwlNSiPAd4pxybUlyhqXgh">载入示例</button>
+      <button onclick="clearAll()" data-page-node-id="PuasGK2oyxCxtFj9B4WRaZ">清空</button>
     </div>
   </div>
 
-  <div id="output"></div>
+  <div id="output" data-page-node-id="QN7WyKwTq0xWElsASTKMdx"></div>
 </div>
 
 <script>
@@ -111,7 +115,7 @@
  * API:
  *   parse(text) -> [sku]                解析粘贴文本
  *   analyze(sku, params, baseDate) -> res  核心计算（可直接传结构化数据对象，绕过 parse）
- *   planA/B(res, params) -> plan          两方案
+ *   planA/B/planAir(res, params) -> plan  三方案（海/空/组合）
  *   toMarkdown(res, plans) -> string    生成 Markdown
  * ============================================================ */
 const ReplenishModule = (function () {
@@ -252,6 +256,10 @@ const ReplenishModule = (function () {
   // 即管道由「提前下单」填充，而非靠加大首批量 → 每批只需 d × (补货周期+安全库存)
   // 至少 1 天量，防止「补货周期 0 + 安全库存 0」算出 0 件导致后续推演失效
   function batchQty(d, params) { return Math.ceil(d * Math.max(1, params.cycle + params.safety)); }
+  // 快补桥接量：空运/陆运等快通道每批只采够「提前期 + 安全库存 + 本通道运输天数」，
+  // 仅覆盖「下单→到货」窗口 + 安全缓冲，够衔接即可、不囤货。主力慢通道（海运）仍用 batchQty（完整周期量）。
+  // 例：d=26.57、提前期2、安全2、空运7 → ⌈26.57×11⌉ = 293（而非填满整段缺口的 638）
+  function bridgeQty(d, params, method) { return Math.ceil(d * (params.leadTime + params.safety + method.d)); }
   // 衔接批次：期望「上批用完日 − 安全库存」到货；采购日早于今天则钳到今天并顺延到货，标记是否赶不上
   function chainBatch(prevUseBy, transit, today, params, qty, d) {
     let arrive = addDays(prevUseBy, -params.safety);
@@ -260,41 +268,87 @@ const ReplenishModule = (function () {
     if (purchase < today) { purchase = today; arrive = addDays(today, transit); lateDays = Math.max(dayDiff(arrive, prevUseBy), 0); }
     return { purchase, arrive, useBy: addDays(arrive, (params.safety * d + qty) / d), lateDays };
   }
-  // ④ 阶梯补货（快补也赶不上断点时）：
-  //   今天同时下「最快方式」与「主力慢方式」两单 → 快补按补货周期滚动续接，直到慢方式首批能接上
-  //   → 之后转慢方式滚动担主力。每批都是周期+安全库存量，保证「够一个补货周期」。
+  // 阶梯接力（快补能赶上断点 或 赶不上 都走这里）：
+  //   今天同时下「最快方式（快补）」与「主力慢方式」两单 → 快补按<b>桥接量</b>滚动续接，直到慢方式首批能接上
+  //   → 之后转慢方式滚动担主力。快补每批仅覆盖「提前期+安全+运输」天，够衔接即可，不囤货。
   function ladderLines(res, params, fast, slow) {
-    const d = res.d, stdQty = batchQty(d, params);
+    const d = res.d, stdQty = batchQty(d, params);            // 主力（慢）批次：完整周期量
+    const bridge = bridgeQty(d, params, fast);                // 快补批次：桥接量（仅覆盖提前期+安全+运输）
     const fastTransit = params.leadTime + fast.d, slowTransit = params.leadTime + slow.d;
-    const slowArrive1 = addDays(res.today, slowTransit);
+    const slowArrive1 = addDays(res.today, slowTransit);      // 海运首批到货日
     const lines = [];
 
     // 快补第 1 单：今天下单，最早到货。到货时若仍在断货期内则库存为 0（不能按 safety 天乐观估算，否则会少排一单）
     const fastArrive1 = addDays(res.today, fastTransit);
     const carry1 = fastArrive1 > res.firstGap.from ? 0 : params.safety * d;
-    let fU = addDays(fastArrive1, (carry1 + stdQty) / d);
-    lines.push({ purchase: res.today, method: fast.m, qty: stdQty, arrive: fastArrive1, useBy: fU });
+    let fU = addDays(fastArrive1, (carry1 + bridge) / d);
+    lines.push({ purchase: res.today, method: fast.m, qty: bridge, arrive: fastArrive1, useBy: fU });
 
-    // 快补滚动续接：直到「慢方式首批到货日 ≤ 快补用完日 − 安全库存」即衔接成功
+    // 快补滚动续接：每批桥接量，只补到「海运首批到货日」为止 —— 海运一到立刻交接、不再续接空运
     let guard = 0;
-    while (dayDiff(fU, slowArrive1) < params.safety && guard++ < 8) {
-      const c = chainBatch(fU, fastTransit, res.today, params, stdQty, d);
-      lines.push({ purchase: c.purchase, method: fast.m, qty: stdQty, arrive: c.arrive, useBy: c.useBy });
+    while (dayDiff(slowArrive1, fU) > 0 && guard++ < 8) {
+      const c = chainBatch(fU, fastTransit, res.today, params, bridge, d);
+      lines.push({ purchase: c.purchase, method: fast.m, qty: bridge, arrive: c.arrive, useBy: c.useBy });
       if (dayDiff(c.useBy, fU) <= 0) break;   // 无法推进则停止，防死循环
       fU = c.useBy;
     }
-    // 快补批次用尽仍未接上 → 标记，由 planB 给出警示（避免输出看似完整实则断档的方案）
-    const linked = dayDiff(fU, slowArrive1) >= params.safety;
-
-    // 慢方式首批：到货时快补可能仍有余量，取「实际余量」与「安全库存」的较大值，避免低估可用天数
-    const carryS = Math.max(d * Math.max(dayDiff(fU, slowArrive1), 0), params.safety * d);
-    let sU = addDays(slowArrive1, (carryS + stdQty) / d);
-    lines.push({ purchase: res.today, method: slow.m, qty: stdQty, arrive: slowArrive1, useBy: sU });
-    for (let i = 0; i < 2; i++) {
-      const c = chainBatch(sU, slowTransit, res.today, params, stdQty, d);
-      lines.push({ purchase: c.purchase, method: slow.m, qty: stdQty, arrive: c.arrive, useBy: c.useBy });
-      sU = c.useBy;
+    // 最后一批快补动态缩减：只撑到「海运首批到货日 + 安全库存」为止，不按固定桥接量过量采购
+    const lastAir = lines.filter(l => l.method === fast.m).pop();
+    if (lastAir) {
+      const targetUB = addDays(slowArrive1, params.safety);   // 海运到货 + 安全缓冲 = 交接目标日
+      if (dayDiff(lastAir.useBy, targetUB) > 0) {             // 末批用完日晚于交接目标 → 缩减
+        const gapDays = Math.max(0, dayDiff(targetUB, lastAir.arrive));  // 末批实际需要覆盖的天数
+        if (gapDays >= 1) {
+          lastAir.qty = Math.ceil(d * gapDays);               // 按需缩减，够撑到交接目标即可
+          lastAir.useBy = targetUB;
+        }
+      }
     }
+    // 快补已覆盖到海运到货日（不再依赖快补）→ 标记衔接成功
+    const linked = dayDiff(fU, slowArrive1) >= 0;
+
+    // 海运首填量：若远超正常单批(>2×)，拆成多个周期间隔的小批，避免单批过大、且第2批尽快(按周期)补
+    //   正常单批基准 stdQty = ⌈d×(周期+安全)⌉；首填总量 seaRampQty = ⌈d×(周期+海运)⌉（覆盖到海运正常滚动接手）
+    const seaRampQty = Math.ceil(d * (params.cycle + slow.d));
+    const SPLIT_K = Math.min(8, Math.max(1, Math.ceil(seaRampQty / stdQty)));
+    const MIN_BATCH = Math.ceil(stdQty * 0.2);                  // 末批余数 < 20% 单批视为无意义微单
+    const remain = seaRampQty - stdQty * (SPLIT_K - 1);         // 末批余数
+    lines.seaRampQty = seaRampQty;
+    if (seaRampQty > 2 * stdQty && SPLIT_K > 1) {
+      const dropRemain = remain < MIN_BATCH;                   // 余数过小 → 直接丢弃，不单独下单（按用户要求）
+      const realK = dropRemain ? SPLIT_K - 1 : SPLIT_K;
+      lines.splitK = realK;
+      lines.splitDropped = dropRemain ? remain : 0;
+      // 拆分：从今天起每 cycle 天发一批（每批=stdQty，余数过小则丢弃），累计覆盖首填总量；之后按重订货点继续滚动
+      let pd = res.today;
+      for (let i = 0; i < realK; i++) {
+        const q = stdQty;                                      // 余数已丢弃，每批均为标准量
+        const arr = addDays(pd, slowTransit);
+        const ub = addDays(arr, (params.safety * d + q) / d);
+        lines.push({ purchase: pd, method: slow.m, qty: q, arrive: arr, useBy: ub });
+        pd = addDays(pd, params.cycle);                        // 每周期一批
+      }
+      // 拆分末批之后，按正常重订货点继续滚动 2 批，展示稳态管道
+      let last = lines[lines.length - 1];
+      for (let i = 0; i < 2; i++) {
+        const c = chainBatch(last.useBy, slowTransit, res.today, params, stdQty, d);
+        lines.push({ purchase: c.purchase, method: slow.m, qty: stdQty, arrive: c.arrive, useBy: c.useBy });
+        last = c;
+      }
+    } else {
+      lines.splitK = 1;
+      // 首填量不大：保持单批首填 + 按重订货点下第2/3批（原逻辑）
+      const sea1UseBy = addDays(slowArrive1, (params.safety * d + seaRampQty) / d);
+      lines.push({ purchase: res.today, method: slow.m, qty: seaRampQty, arrive: slowArrive1, useBy: sea1UseBy });
+      let sea2Purchase = addDays(slowArrive1, (params.cycle + slow.d) - (params.leadTime + slow.d + params.safety));
+      if (dayDiff(sea2Purchase, res.today) < 0) sea2Purchase = res.today;
+      const sea2Arrive = addDays(sea2Purchase, slowTransit);
+      const sea2UseBy = addDays(sea2Arrive, (params.safety * d + stdQty) / d);
+      lines.push({ purchase: sea2Purchase, method: slow.m, qty: stdQty, arrive: sea2Arrive, useBy: sea2UseBy });
+      const c3 = chainBatch(sea2UseBy, slowTransit, res.today, params, stdQty, d);
+      lines.push({ purchase: c3.purchase, method: slow.m, qty: stdQty, arrive: c3.arrive, useBy: c3.useBy });
+    }
+
     lines.linked = linked;
     return lines;
   }
@@ -363,17 +417,28 @@ const ReplenishModule = (function () {
     const latest = latestP1 < res.today ? "最迟采购节点已过，须立即下单" : "首批最迟采购日 " + fmtMD(latestP1);
 
     const seaNote = +params.sea > 0 ? "" : "海运未填写（0），按默认 " + SEA_DEFAULT + " 天估算；";
-    return { title: "方案一（纯" + slow.m + "·分批）", note: seaNote + "全程只用" + slow.m + "分批补货，每批 " + q1 + " 件（补货周期+安全库存），每 " + params.cycle + " 天滚动一单；" + latest, risk,
+    return { title: "方案一（纯海运·分批）", note: seaNote + "全程只用" + slow.m + "分批补货，每批 " + q1 + " 件（补货周期+安全库存），每 " + params.cycle + " 天滚动一单；" + latest, risk,
       lines: [{ purchase: p1, method: slow.m, qty: q1, arrive: a1, useBy: u1 },
         { purchase: c2.purchase, method: slow.m, qty: q2, arrive: c2.arrive, useBy: c2.useBy },
         { purchase: c3.purchase, method: slow.m, qty: q3, arrive: c3.arrive, useBy: c3.useBy }] };
   }
 
+  // 方案三（组合·推荐）：快+慢接力，防断货且资金均衡。
+  // 若所选物流使组合退化为单一渠道，则与方案一/方案二等价，仅作引用、不重复展开。
   function planB(res, params) {
     const d = res.d, slow = enabledSlowest(params), fast = fastest(params);
-    const fastMin = batchQty(d, params);   // 快补起采下限，避免高频小单
     const noMethod = options(params).length === 0
       ? "未填写任何运输方式，按海运 " + SEA_DEFAULT + " 天默认估算；" : "";
+    const title = "方案三（组合·推荐）";
+
+    // —— 单一渠道退化：与方案一/方案二等价，直接引用、不展开明细 ——
+    if (slow.m === fast.m) {
+      if (slow.m === "海运") return { title, collapsedTo: "plan1", note: "同方案一（纯海运·分批）", lines: [] };
+      if (slow.m === "空运") return { title, collapsedTo: "plan2", note: "同方案二（纯空运·分批）", lines: [] };
+      const a = planA(res, params, slow, res.today);
+      return { title, note: noMethod + "仅" + slow.m + "一种方式可用，等价于纯" + slow.m + "分批", risk: a.risk, lines: a.lines };
+    }
+
     const slowTransit = params.leadTime + slow.d;
     const slowArrive = addDays(res.today, slowTransit);
     // 在途能否撑到主力方式首批到货，且到货时仍留有安全库存（贴线不算充足）
@@ -390,43 +455,60 @@ const ReplenishModule = (function () {
 
     if (canSustain) {
       const a = planA(res, params, slow, firstPurchase);
-      return { title: "方案二（组合·推荐）", note: noMethod + "在途充足，直接" + slow.m + "分批" + deferredNote, risk: a.risk, lines: a.lines };
+      return { title, note: noMethod + "在途充足，直接" + slow.m + "分批" + deferredNote, risk: a.risk, lines: a.lines };
     }
+    // ②/③ 快补能赶上断点（fastArrive ≤ 断点）或 ④ 赶不上（fastArrive > 断点）
+    // 统一走「快补阶梯接力」：每个快补批次仅采够「提前期+安全库存+运输天数」的桥接量，
+    // 滚动续接直至主力首批到货接手，再转主力滚动担主力。海陆空混合时快补不会一次性采购过量。
     const gapFrom = res.firstGap.from;
-    const a = planA(res, params, slow, firstPurchase);
-
-    // 今天下单最快物流能否赶上断点
     const fastArrive = addDays(res.today, params.leadTime + fast.d);
+    const catchUp = fastArrive <= gapFrom;
+    const bridge = bridgeQty(d, params, fast);
+    const lines = ladderLines(res, params, fast, slow);
+    const nFast = lines.filter(l => l.method === fast.m).length;
+    const unlinked = lines.linked === false
+      ? "；⚠️ 快补批次数已达上限（8 批）仍未接上" + slow.m + "，方案可能残留断档，建议加大单批量或启用" + (params.land > 0 && slow.m !== "陆运" ? "陆运等" : "") + "中间渠道" : "";
+    // 快补只补到海运到货日（末批动态缩减至「海运到货+安全」）；海运首填量拆成周期间隔小批，到货后转海运滚动担主力
+    const seaPart = lines.splitK > 1
+      ? (slow.m + "首填量 " + lines.seaRampQty + " 件拆分为每 " + params.cycle + " 天一批（共 " + lines.splitK + " 批）"
+         + (lines.splitDropped ? "、末批微量余数 " + lines.splitDropped + " 件过小已丢弃" : "") + "、到货即滚动担主力")
+      : (slow.m + "首批 " + lines.seaRampQty + " 件（首填量·够覆盖到" + slow.m + "第2批到货）");
+    const lastAir = lines.filter(l => l.method === fast.m).pop();
+    const tailNote = (lastAir && lastAir.qty < bridge) ? "，末批按需缩至 " + lastAir.qty + " 件（仅撑到" + slow.m + "到货+安全库存）" : "";
+    const rampNote = fast.m + "每批 " + bridge + " 件（桥接量·仅覆盖提前期+安全+运输）补到" + slow.m + "首批到货日为止共 " + nFast + " 批（约 " + (nFast * bridge) + " 件" + tailNote + "）；" + seaPart + "，不再空运";
 
-    // 快补与主力同为一条渠道（如纯空运）→ 角色退化，不重复出快补单，直接按主力方式分批
-    if (slow.m === fast.m) {
-      const risk = fastArrive > gapFrom
-        ? "预计断货 " + fmtMD(gapFrom) + "→" + fmtMD(fastArrive) + "，缺货约 " + Math.ceil(d * dayDiff(fastArrive, gapFrom)) + " 件；建议立即催提在途或加价更快渠道"
-        : a.risk;
-      return { title: "方案二（组合·推荐）", note: noMethod + "仅" + slow.m + "一种方式可用，快补与主力同渠道，直接按" + slow.m + "分批", risk, lines: a.lines };
-    }
-
-    // ④ 快补也赶不上：阶梯补货 —— 今天同时下快补 + 慢方式，快补滚动续接至慢方式接手，之后慢方式为主
-    if (fastArrive > gapFrom) {
-      const stockoutQty = Math.ceil(d * dayDiff(fastArrive, gapFrom));
-      const lines = ladderLines(res, params, fast, slow);
-      const nFast = lines.filter(l => l.method === fast.m).length;
-      const unlinked = lines.linked === false
-        ? "；⚠️ 快补批次数已达上限（8 批）仍未接上" + slow.m + "，方案可能残留断档，建议加大单批量或启用" + (params.land > 0 && slow.m !== "陆运" ? "陆运等" : "") + "中间渠道" : "";
-      return { title: "方案二（组合·推荐）",
-        note: "断点太近，" + fast.m + "今天下单也赶不上：今日同时下「" + fast.m + "」与「" + slow.m + "」两单，"
-          + fast.m + "每批 " + batchQty(d, params) + " 件（够一个补货周期）滚动续接共 " + nFast + " 批（"
-          + (nFast * batchQty(d, params)) + " 件，成本较高），直至" + slow.m + "首批到货接手，之后转" + slow.m + "滚动担主力",
-        risk: "预计断货 " + fmtMD(gapFrom) + "→" + fmtMD(fastArrive) + "，缺货约 " + stockoutQty + " 件；建议立即催提在途或加价更快渠道" + unlinked,
+    if (catchUp) {
+      return { title,
+        note: noMethod + fast.m + "今天下单可赶上断点，" + rampNote,
+        risk: "",
         lines };
     }
+    const stockoutQty = Math.ceil(d * dayDiff(fastArrive, gapFrom));
+    return { title,
+      note: "断点太近，" + fast.m + "今天下单也赶不上：今日同时下「" + fast.m + "」与「" + slow.m + "」两单，" + rampNote,
+      risk: "预计断货 " + fmtMD(gapFrom) + "→" + fmtMD(fastArrive) + "，缺货约 " + stockoutQty + " 件；建议立即催提在途或加价更快渠道" + unlinked,
+      lines };
+  }
 
-    const missQty = Math.max(Math.ceil(d * dayDiff(slowArrive, gapFrom)), fastMin);
-    const pFast = addDays(gapFrom, -(params.leadTime + fast.d));
-    const aFast = addDays(pFast, params.leadTime + fast.d);
-    const uFast = addDays(aFast, missQty / d);
-    return { title: "方案二（组合·推荐）", note: "在途撑不到" + slow.m + "到货，" + fast.m + "补缺口，" + slow.m + "担主力", risk: "",
-      lines: [{ purchase: pFast, method: fast.m, qty: missQty, arrive: aFast, useBy: uFast }].concat(a.lines) };
+  // 方案二（纯空运·分批）：与方案一对称，仅强制空运，不管其他渠道是否填写。
+  // 空运未填(0)时回退默认 7 天；首批延后到重订货点（充裕时延后、紧急/缺口则今天）。
+  function planAir(res, params) {
+    const d = res.d;
+    const filled = +params.air > 0;
+    const airDays = filled ? +params.air : 7;
+    const airMethod = { m: "空运", d: airDays };
+    const airTransit = params.leadTime + airDays;
+    const exhaust = res.firstGap ? res.firstGap.from : res.rows[res.rows.length - 1].useBy;
+    const latestP1 = addDays(exhaust, -airTransit);
+    let firstPurchase = computeReorderDate(res, params, airMethod);
+    if (firstPurchase > latestP1) firstPurchase = latestP1;
+    if (firstPurchase < res.today) firstPurchase = res.today;
+    const a = planA(res, params, airMethod, firstPurchase);
+    const warn = filled ? "" : "（空运运输天数未填写，按默认 7 天估算）";
+    const deferredNote = firstPurchase > res.today ? "（首批延后至 " + fmtMD(firstPurchase) + " 采购·重订货点）" : "";
+    return { title: "方案二（纯空运·分批）",
+      note: warn + "全程只用空运分批补货，每批 " + a.lines[0].qty + " 件（补货周期+安全库存），每 " + params.cycle + " 天滚动一单" + deferredNote,
+      risk: a.risk, lines: a.lines };
   }
 
   /* ---------- Markdown ---------- */
@@ -466,7 +548,7 @@ const ReplenishModule = (function () {
     return md;
   }
 
-  return { parse, analyze, planA, planB, toMarkdown, fmt, fmtMD, parseDate };
+  return { parse, analyze, planA, planB, planAir, toMarkdown, fmt, fmtMD, parseDate };
 })();
 
 /* ============================================================
@@ -487,8 +569,29 @@ function getBaseDate() {
   return v ? new Date(v) : new Date();
 }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+/* 术语浮动注释：给 .tip 元素绑定 hover 浮层（支持多行 br，不裁剪、不随滚动偏移） */
+function bindTips(rootEl) {
+  if (!rootEl) return;
+  rootEl.querySelectorAll(".tip").forEach(el => {
+    el.addEventListener("mouseenter", function () {
+      const box = document.createElement("div");
+      box.className = "tipbox";
+      box.innerHTML = el.getAttribute("data-tip") || "";
+      document.body.appendChild(box);
+      const r = el.getBoundingClientRect();
+      const tw = box.offsetWidth;
+      let left = r.left;
+      if (left + tw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - tw - 8);
+      box.style.left = left + "px";
+      box.style.top = (r.bottom + 6) + "px";
+      el._box = box;
+    });
+    el.addEventListener("mouseleave", function () { if (el._box) { el._box.remove(); el._box = null; } });
+  });
+}
 
-/* 计算说明面板：参数定义 / 公式 / 方案逻辑，数值随填写值实时变化 */
+
+/* 计算说明面板：参数定义 / 公式 / 方案逻辑，数值随填写值实时变化；术语带 hover 浮动注释 */
 function renderCalcDoc() {
   const p = getParams();
   const base = document.getElementById("p-base").value || "今天";
@@ -496,65 +599,71 @@ function renderCalcDoc() {
   const tbl = (head, rows) => '<table class="def"><tr>' + head.map(t => "<th>" + t + "</th>").join("")
     + "</tr>" + rows.map(r => "<tr>" + r.map(c => "<td>" + c + "</td>").join("") + "</tr>").join("") + "</table>";
   const mth = (d, extra) => d > 0 ? V(d + " 天") : V("0") + "（未启用" + (extra || "") + "）";
+  // 术语浮动注释：T(显示文本, 注释)；注释支持 <br> 换行，内部避免 ASCII 双引号
+  const escAttr = s => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  const T = (txt, tip) => '<span class="tip" data-tip="' + escAttr(tip) + '">' + txt + "</span>";
 
-  let h = "<h3>一、参数定义</h3>";
+  let h = "<h3>一、参数定义 <span style='color:var(--muted);font-weight:400;font-size:12px'>（鼠标移到带下划线的术语可查看浮动注释）</span></h3>";
   h += tbl(["参数", "当前值", "说明"], [
-    ["基准日", V(base), "一切日期起算点；最早采购日 = 基准日，输出中不出现过去日期"],
-    ["补货周期", V(p.cycle + " 天"), "滚动下单间隔；同时是单批覆盖天数的基准"],
-    ["采购提前期", V(p.leadTime + " 天"), "下单 → 供应商发货的准备时间"],
-    ["安全库存", V(p.safety + " 天"), "每批到货时应保留的库存天数（缓冲）"],
-    ["海运", mth(p.sea, "；方案一仍按默认 25 天估算"), "0 = 本次不用该方式"],
-    ["陆运", mth(p.land), "0 = 本次不用该方式"],
-    ["空运", mth(p.air), "0 = 本次不用该方式"],
+    ["基准日 base", V(base), "一切日期的起算点；最早采购日 = 基准日，输出中" + T("不出现过去日期", "任何采购日 / 最迟采购日都不会早于基准日；若最迟节点已过，只提示「须立即下单」而不显示历史日期")],
+    [T("补货周期 cycle", "相邻两批的采购间隔天数；同时也是单批库存要覆盖的天数基准"), V(p.cycle + " 天"), "滚动下单间隔；同时是单批覆盖天数的基准"],
+    [T("采购提前期 leadTime", "下单之后、到供应商实际发货之间的准备天数（如备货、报关）"), V(p.leadTime + " 天"), "下单 → 供应商发货的准备时间"],
+    [T("安全库存 safety", "每批到货时希望手里仍保留的库存天数，用于吸收运输延误与销量波动"), V(p.safety + " 天"), "每批到货时应保留的缓冲库存天数"],
+    [T("海运 sea", "海运的运输时效（天）。填 0 表示本次不用海运"), mth(p.sea, "；方案一仍按默认 25 天估算"), "0 = 本次不用该方式"],
+    [T("陆运 land", "陆运的运输时效（天）"), mth(p.land), "0 = 本次不用该方式"],
+    [T("空运 air", "空运的运输时效（天）。填 0 时方案二按默认 7 天估算"), mth(p.air, "；方案二仍按默认 7 天估算"), "0 = 本次不用该方式"],
   ]);
-  h += '<div class="note">三种运输方式默认为 0（未启用），需手动填写实际天数。填 0 = 该渠道本次不参与方案二；但<b>方案一恒按海运 25 天</b>作为成本基准（即使海运填 0）。</div>';
+  h += '<div class="note">三种运输方式<b>默认 海运25天 / 陆运7天 / 空运5天</b>。填 0 = 该渠道本次不用（不参与' + T("方案三（组合）", "主力 = 已启用方式中最慢者、快补 = 最快者；全 0 时回退海运 25 天") + '）；但' + T("方案一恒按海运", "无论是否填写海运，方案一都只用海运，海运 0 则取默认 25 天（成本基准）") + '、' + T("方案二恒按空运", "方案二强制只用空运，空运 0 则取默认 7 天") + '作为基准（即使对应天数填 0）。</div>';
   h += '<div class="note">⚠️ 安全库存口径：当前为固定 ' + p.safety + ' 天缓冲，未计入销量波动与运输延误分布。若日销波动大，建议按 Z × σ × √(提前期+运输天数) 估算后回填本参数（待优化）。</div>';
 
   h += "<h3>二、输入字段定义</h3>";
   h += tbl(["输入字段", "含义", "说明"], [
-    ["日均7天 d", "统一消耗口径", "缺失时用「销量7天 ÷ 7」推导"],
+    [T("日均7天 d", "最近 7 天日销量均值，全表统一的消耗口径；缺失时用「销量7天 ÷ 7」推导"), "统一消耗口径", "所有「预计用完」「断货」计算都用它"],
     ["可用库存", "当前可售库存", "时间轴起点"],
-    ["在途批次", "已采购未到货", "必须有「预计到货」且为 YYYY-MM-DD 才纳入计算"],
-    ["日均变化率", "日均7天 vs 日均30天", "绝对值 > 10% 时输出趋势提示，不参与计算"],
+    [T("在途", "已采购、尚未到货的批次；其预计到货参与时间轴推演") + "批次", "已采购未到货", "必须有" + T("预计到货", "批次预计送达日期，须为 4 位年份 YYYY-MM-DD，否则列为异常不参与") + "且为 4 位年份才纳入计算"],
+    [T("日均变化率", "日均7天相对日均30天的涨跌幅度"), "日均7天 vs 日均30天", "绝对值 > 10% 时输出趋势提示，不参与计算"],
   ]);
 
-  h += "<h3>三、计算公式</h3>";
+  h += "<h3>三、基础计算公式</h3>";
   h += tbl(["计算项", "公式", "说明"], [
-    ["可售天数", "可用库存 ÷ d", "低于补货周期 → 红字「需立即提货」"],
-    ["单批采购量", "⌈d × (补货周期 + 安全库存)⌉ = ⌈d × " + (p.cycle + p.safety) + "⌉", "三批等量；与运输时长无关（管道靠提前下单填充）"],
-    ["到货日", "采购日 + 提前期 + 运输天数", "—"],
-    ["预计用完（当前库存行）", "基准日 + 可用库存 ÷ d", "—"],
-    ["预计用完（批次行）", "到货日 + 到货后库存 ÷ d", "到货后库存 = max(到货时剩余, 0) + 本批数量"],
-    ["断货判定", "本行用完日 < 下一行到货日", "或时间轴末尾耗尽后无任何到货（开放式断货）"],
-    ["缺货件数", "⌈d × 断货天数⌉", "断货期损失的销量（机会成本），不计入库存消耗、不从后续库存扣减"],
-    ["贴线到货", "到货时剩余 < 1 天用量", "红字「⚠️贴线」"],
-    ["库存状态", "30 天内无断货 = 充足；距缺货 ≤10 天 = 紧急；10–30 天 = 注意", "以时间轴推算为准"],
-    ["超期在途", "采购 > 90 天仍未提货", "底部红字列出，忽略不计"],
-    ["异常批次", "无预计到货 / 日期非 YYYY-MM-DD", "底部红字列出，不参与计算"],
+    ["可售天数", "可用库存 ÷ " + T("d", "日均7天") , "低于" + T("补货周期", "相邻两批采购间隔，见参数定义") + " → 红字「需立即提货」"],
+    [T("单批采购量 batchQty", "慢通道（海运）每批标准量 = ⌈d × (cycle+safety)⌉；三批等量、与运输时长无关（管道靠提前下单填充）"), "⌈d × (补货周期 + 安全库存)⌉ = ⌈d × " + (p.cycle + p.safety) + "⌉", "三批等量；与运输时长无关"],
+    [T("桥接量 bridgeQty", "快通道（空运/陆运）每批只买「够撑到货」的量 = ⌈d × (leadTime+safety+本通道运输天数)⌉，不囤货"), "⌈d × (leadTime+safety+运输天数)⌉ = ⌈d × " + (p.leadTime + p.safety) + "+运输天数⌉", "仅快通道使用，避免一次性采购过量"],
+    ["到货日", "采购日 + leadTime + 运输天数", "—"],
+    ["预计用完（批次行）", "到货日 + (max(到货时剩余,0) + 本批数量) ÷ d", "断货期库存为 0，缺货不计入消耗"],
+    ["断货判定", "本行用完日 < 下一行到货日", "或时间轴末尾耗尽后无后续到货（开放式断货）"],
+    [T("缺货件数 missQty", "断货期间损失的销量 ⌈d × 断货天数⌉，属机会成本，不计入库存消耗、不从后续库存扣减"), "⌈d × 断货天数⌉", "断货期损失销量，不扣减库存"],
+    [T("贴线", "到货时剩余库存不足 1 天用量，缓冲极薄，轻微延误即断货"), "到货时剩余 < 1 天用量", "红字「⚠️贴线」"],
+    ["库存状态", "30 天无断货 = 充足；≤10 天 = 紧急；10–30 天 = 注意", "以时间轴推算为准"],
+    [T("超期在途", "采购距今 > 90 天仍未提货的批次"), "采购 > 90 天未提货", "底部红字列出，忽略不计"],
+    [T("异常批次", "无预计到货，或日期非 4 位年份"), "无预计到货 / 日期异常", "底部红字列出，不参与计算"],
   ]);
 
   h += "<h3>四、方案逻辑</h3>";
-  h += "<table><tr><td style=\"width:26%;font-weight:600\">方案一（纯海运·分批）<br><span style=\"font-weight:400;color:var(--muted)\">成本基准</span></td><td>"
-    + "主力<b>恒为海运</b>（海运填 0 时按默认 25 天估算）。<b>三批等量</b>：每批都是 ⌈d × " + (p.cycle + p.safety) + "⌉，第 1 批基准日下单，之后每 "
-    + p.cycle + " 天滚动一单。<br>紧急场景下首批到货通常晚于断点，方案一会明确标注「不可行」——<b>它是成本参照，不是可执行方案</b>。</td></tr>"
-    + "<tr><td style=\"font-weight:600\">方案二（组合·推荐）<br><span style=\"font-weight:400;color:var(--muted)\">可执行</span></td><td>"
-    + "主力 = 已启用方式中<b>最慢</b>者；快补 = 已启用方式中<b>最快</b>者（均为 0 时回退海运 25 天）。<br><b>首批延后到重订货点</b>：当「现有+到货库存」可覆盖天数降至（提前期+安全+运输）时再下单，不提前占款；已≤阈值或遇紧急缺口则今天下单。四个分支：<br>"
-    + "① 在途能撑到「主力到货 + 安全库存」→ 直接主力分批；<br>"
-    + "② 快补与主力同渠道（如只填了空运）→ 角色退化，直接主力分批；<br>"
-    + "③ 快补能赶上断点 → 快补补「撑到主力到货」的缺口（≥ 一个补货周期量），主力担后续；<br>"
-    + "④ 快补也赶不上 → <b>阶梯补货</b>：今日同时下「快补」与「主力慢方式」两单，快补每批一个补货周期量、滚动续接，"
-    + "直到主力首批到货接手，之后转主力滚动担主力；同时给出断货区间 + 缺货件数预警。</td></tr></table>";
+  h += "<table><tr><td style='width:26%;font-weight:600'>方案一（纯海运·分批）<br><span style='font-weight:400;color:var(--muted)'>成本基准</span></td><td>"
+    + T("主力恒为海运", "无论参数是否填海运，方案一都只用海运；海运 0 则取默认 25 天（最经济渠道的成本参照）") + "（海运填 0 按默认 25 天估算），" + T("三批等量", "3 个批次采购量完全相同，均为 batchQty，不因批次序号加量") + "：每批 ⌈d × " + (p.cycle + p.safety) + "⌉，第 1 批基准日下单，之后每 "
+    + p.cycle + " 天滚动一单。<br>紧急场景下首批到货常晚于断点，方案一会明确标注「不可行」——它是成本参照而非可执行方案。</td></tr>"
+    + "<tr><td style='font-weight:600'>方案二（纯空运·分批）<br><span style='font-weight:400;color:var(--muted)'>应急/最快</span></td><td>"
+    + "与方案一对称，仅强制" + T("空运", "方案二只用空运，空运 0 则取默认 7 天") + "（空运 0 按默认 7 天估算），不管海运/陆运是否填写。每批 ⌈d × " + (p.cycle + p.safety) + "⌉，首批延后到" + T("重订货点", "现有+在途库存可覆盖天数降至 (leadTime+safety+空运天数) 时再下单，不提前占款；紧急/缺口则今天") + "（充裕时延后、紧急/缺口则今天），之后每 " + p.cycle + " 天滚动一单。</td></tr>"
+    + "<tr><td style='font-weight:600'>方案三（组合·推荐）<br><span style='font-weight:400;color:var(--muted)'>可执行</span></td><td>"
+    + "主力 = " + T("已启用方式中最慢者", "在填了天数(d>0)的方式里取运输最久的；全 0 则回退海运 25 天") + "；快补 = " + T("已启用方式中最快者", "在填了天数的方式里取运输最快的；全 0 则回退海运 25 天") + "。<br>首批延后到" + T("重订货点", "现有+到货库存可覆盖天数降至 (leadTime+safety+运输天数) 时再采，不提前占款；已≤阈值或遇紧急缺口则今天") + "。四种情况见下方「五、方案三分情况说明」。</td></tr></table>";
   h += '<div class="note">批次衔接固定留安全库存（下一批到货日 = 上批用完日 − ' + p.safety + ' 天），因此单批量无需再叠加运输时长。</div>';
+  h += '<div class="note">快通道（空运/陆运）采用' + T("桥接量", "每批仅覆盖 leadTime+safety+本通道运输天数，够衔接即可不囤货") + '；慢通道（海运）仍用完整周期批量 ⌈d × ' + (p.cycle + p.safety) + '⌉。</div>';
 
-  h += "<h3>五、为什么三批等量？</h3>";
-  h += "<table><tr><td>稳态滚动模型下，<b>管道库存靠「提前下单」填充，而不是靠加大首批量</b>。证明：<br>"
-    + "第 n 批到货日 = 基准日 + (提前期 + 运输天数) + (n−1) × 周期跨度<br>"
-    + "第 n 批采购日 = 到货日 − (提前期 + 运输天数) = 基准日 + (n−1) × 周期跨度<br>"
-    + "→ 第 2 批采购日恰为「基准日 + 1 个周期跨度」，<b>与运输时长无关</b>。所以首批量加大并不能让首批更早到货，"
-    + "每批只需覆盖一个补货周期 + 安全库存即可。<br>"
-    + "若按「每批都买运输全程的量」，等于把管道重复填满三次，资金占用翻数倍（本例 2154 件 → 720 件）。</td></tr></table>";
+  h += "<h3>五、方案三（组合）分情况说明</h3>";
+  h += tbl(["情况", "触发条件", "处理"], [
+    [T("A. 无缺口", "在途库存足以撑到主力首批到货，且到货后仍留安全库存"), "在途能撑到「主力到货 + safety」", "直接按主力方式分批；首批可延后到重订货点，不提前占款"],
+    [T("B. 单渠道退化", "只填了一种运输方式，组合退化为单一渠道"), "仅填海运 / 仅填空运 / 仅填陆运", T("与方案一/二等价，仅引用不展开", "仅海运 → 同方案一；仅空运 → 同方案二；仅陆运 → 展开纯陆运明细")],
+    [T("C. 快补赶上", "有缺口但今天下单最快物流能在断点前到货"), "快补到货日 ≤ 断点", "快补按" + T("桥接量", "仅覆盖 leadTime+safety+快补运输天数") + "滚动补缺口；" + T("只补到主力首批到货日为止", "主力一到立刻交接，快补不再续接，避免空运过量") + "，之后主力滚动担主力"],
+    [T("D. 快补赶不上（阶梯接力）", "有缺口且最快物流今天下单也晚于断点"), "快补到货日 > 断点", "今日同时下「快补」与「主力」两单；快补按桥接量补到主力到货日；" + T("末批动态缩减", "最后一批快补不按固定桥接量，而是缩至仅撑到「主力到货日+安全库存」，避免重叠过量") + "；主力" + T("首填量", "⌈d × (cycle+主力运输天数)⌉，覆盖到主力正常滚动接手") + "若 > 2× 单批量则" + T("拆分", "拆成每周期一批的小批，第2批仅隔 1 周期、末批余数 < 20% 单批则丢弃") + "；主力到货后转滚动担主力。同时给断货区间 + 缺货件数预警"],
+  ]);
 
-  document.getElementById("calc-doc-body").innerHTML = h;
+  h += "<h3>六、为什么三批等量？</h3>";
+  h += "<table><tr><td>稳态滚动模型下，" + T("管道库存靠「提前下单」填充", "每批在上一拍用完前 safety 天就到货，故每批只需覆盖一个周期 + 安全") + "，而非靠加大首批量。证明：第 n 批采购日 = 基准日 + (n−1) × 周期，与运输时长无关。首批量加大并不能让首批更早到货，每批只需覆盖一个" + T("补货周期+安全库存", "cycle+safety 天") + "即可。</td></tr></table>";
+
+  const body = document.getElementById("calc-doc-body");
+  body.innerHTML = h;
+  bindTips(body);
 }
 
 function run() {
@@ -571,7 +680,7 @@ function run() {
   for (const sku of skus) {
     const res = ReplenishModule.analyze(sku, params, base);
     if (res.error) { html += '<div class="sku-card"><div class="err">' + esc(res.error) + "</div></div>"; continue; }
-    const plans = [ReplenishModule.planA(res, params), ReplenishModule.planB(res, params)];
+    const plans = [ReplenishModule.planA(res, params), ReplenishModule.planAir(res, params), ReplenishModule.planB(res, params)];
     const md = ReplenishModule.toMarkdown(res, plans, params);
     const badge = res.status === "充足" ? "green" : res.status === "注意" ? "orange" : "red";
     tally[res.status] = (tally[res.status] || 0) + 1;
