@@ -71,6 +71,9 @@
   .doc .note { color:var(--orange); font-size:12px; margin:6px 0; }
   /* hover 浮动注释 */
   .tip { border-bottom:1px dotted var(--muted); cursor:help; }
+  .tip.q { display:inline-block; width:15px; height:15px; line-height:13px; text-align:center;
+    border:1px solid var(--muted); border-radius:50%; font-size:11px; color:var(--muted);
+    background:#fafbfc; vertical-align:middle; }
   .tipbox { position:fixed; z-index:9999; max-width:340px; background:#1f2329; color:#fff;
     font-size:12px; line-height:1.55; padding:8px 10px; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.22); pointer-events:none; }
 </style>
@@ -78,7 +81,7 @@
 <body data-page-node-id="kB9duiHPxTMY9ronu84iuf">
 <div class="wrap" data-page-node-id="D5BO0NMeiDA7ae892aEU4g">
   <h1 data-page-node-id="YuuHRAZjW5J1qHSCl9mVCK">补货分析模块</h1>
-  <div class="sub" data-page-node-id="RzNN1Dia6H6R0imiSYuIes">粘贴 SKU 数据 → 点「分析」→ 本地计算输出时间轴 + 两方案，零 AI 调用</div>
+  <div class="sub" data-page-node-id="RzNN1Dia6H6R0imiSYuIes">粘贴 SKU 数据 → 点「分析」→ 本地计算输出时间轴 + 三方案，零 AI 调用</div>
 
   <div class="panel" data-page-node-id="DF2gZwwtz4OjTap4lOH2At">
     <div class="params" oninput="renderCalcDoc()" onchange="renderCalcDoc()" data-page-node-id="k2AeUAvl2n1VfXiqvpFRj4">
@@ -114,10 +117,16 @@
  * 核心模块 ReplenishModule（可整体复制到你的网站复用）
  * API:
  *   parse(text) -> [sku]                解析粘贴文本
- *   analyze(sku, params, baseDate) -> res  核心计算（可直接传结构化数据对象，绕过 parse）
- *   planB/planAir(res, params) -> plan  两方案（组合推荐 / 纯空运应急）
+ *   analyze(sku, params, baseDate, opts) -> res  核心计算（可直接传结构化数据对象，绕过 parse）
+ *                                     opts.excludeOverdue = true → 方案三口径（逾期未提货不并入库存）
+ *   planB(res, params, titleOverride) -> plan   方案一（组合·含逾期未提货）；
+ *                                     传「不含逾期的 res + 标题」→ 方案三（组合·不含逾期）
+ *                                     （仅空运退化分支：方案一折叠引用方案二；方案三口径不同，独立展开明细）
+ *   planAir(res, params) -> plan        方案二（纯空运·含逾期）
  *   planA(res, params, chan, fp, title)  纯单渠道分批，供 planB 内部复用
- *   toMarkdown(res, plans) -> string    生成 Markdown
+ *   alignNoRows(res, resNo) -> Map      两口径时间轴行按稳定键对齐（toMarkdown 与 UI 共用）
+ *   toMarkdown(res, plans, params, resNo) -> string  生成 Markdown（resNo = 不含逾期口径，供时间轴第 6 列）
+ *   （UI 层 run() 负责方案三两个边界规则：无逾期批次时折叠提示；断货更早时 note 顶部加对照行）
  * ============================================================ */
 const ReplenishModule = (function () {
 
@@ -173,10 +182,15 @@ const ReplenishModule = (function () {
   }
 
   /* ---------- 核心计算 ---------- */
-  function analyze(sku, params, baseDate) {
+  // opts.excludeOverdue：方案三口径 —— 逾期未提货批次视为「到不了」，完全不参与推演
+  //   （不并入库存、不产生时间轴行）。其 rows = 含逾期口径 rows 去掉 overdue 行后的序列，
+  //   故两口径可按「非 overdue 行」一一对应，时间轴得以并排给出两列「预计用完」。
+  //   缺省 false 时行为与改造前逐字节一致。
+  function analyze(sku, params, baseDate, opts) {
     const d = sku.daily7;
     if (!d || d <= 0) return { error: "SKU " + (sku.code || "") + " 日均7天缺失或为0，无法计算" };
     const today = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+    const excludeOverdue = !!(opts && opts.excludeOverdue);
 
     const overdue = [], upcoming = [], anomaly = [];
     for (const b of sku.inTransit) {
@@ -189,7 +203,10 @@ const ReplenishModule = (function () {
       }
       const eta = parseDate(b.eta);
       if (!eta) { anomaly.push(Object.assign({}, b, { reason: b.eta ? "预计到货日期格式异常" : "无预计到货日期" })); continue; }
-      if (eta <= today) overdue.push(Object.assign({}, b, { etaDate: eta })); else upcoming.push(Object.assign({}, b, { etaDate: eta }));
+      if (eta <= today) {
+        if (excludeOverdue) continue;   // 方案三口径：逾期未提货 → 当到不了，不入时间轴、不并入库存
+        overdue.push(Object.assign({}, b, { etaDate: eta }));
+      } else upcoming.push(Object.assign({}, b, { etaDate: eta }));
     }
     upcoming.sort((a, b) => a.etaDate - b.etaDate);
     overdue.sort((a, b) => (parseDate(a.purchaseDate) || today) - (parseDate(b.purchaseDate) || today));
@@ -490,7 +507,7 @@ const ReplenishModule = (function () {
   }
 
   // planA：纯单渠道分批。不作为独立方案对外暴露，仅被以下场景复用：
-  //   方案一（组合）的 A 档「主力到货前不断货」、E1「在途接得住」、单一渠道退化分支。
+  //   组合方案（方案一 / 方案三）的 A 档「主力到货前不断货」、E1「在途接得住」、单一渠道退化分支。
   // 首批采购日贴断点（到货 = 断点−安全库存）；之后每补货周期一批（周期批），共预排 N 批。
   function planA(res, params, mainMethod, fpOverride, title) {
     const d = res.d, slow = mainMethod || seaMethod(params);
@@ -525,17 +542,28 @@ const ReplenishModule = (function () {
       risk, lines };
   }
 
-  // 方案一（组合·推荐）：快+慢接力，防断货且资金均衡。
+  // 方案一（组合·含逾期未提货）：快+慢接力，防断货且资金均衡。
+  //   本函数复用为方案三（组合·不含逾期）：唯一差异是传入的 res 口径 ——
+  //   方案一传含逾期的推演结果，方案三传 excludeOverdue 的推演结果，并用 titleOverride 换标题。
   // 若所选物流使组合退化为单一渠道：仅空运 → 与方案二等价（仅引用）；其余直接展开纯渠道明细。
-  function planB(res, params) {
+  function planB(res, params, titleOverride) {
     const d = res.d, slow = enabledSlowest(params), fast0 = fastest(params);
     const noMethod = options(params).length === 0
       ? "未填写任何运输方式，按海运 " + SEA_DEFAULT + " 天默认估算；" : "";
-    const title = "方案一（组合·推荐）";
+    const title = titleOverride || "方案一（组合·含逾期未提货）";
 
-    // —— 单一渠道退化：与方案二等价，直接展开、不重复计算 ——
+    // —— 单一渠道退化 ——
+    // 仅空运：方案一（含逾期）与方案二（含逾期纯空运）等价 → 折叠引用、不重复计算；
+    //   方案三（不含逾期，titleOverride 存在）口径不同 —— 有逾期批次时采购日/批量均不等，
+    //   不能折叠到含逾期的方案二，必须用传入的 res（不含逾期口径）独立展开明细。
     if (slow.m === fast0.m) {
-      if (slow.m === "空运") return { title, collapsedTo: "plan2", note: "同方案二（纯空运·分批）", lines: [] };
+      if (slow.m === "空运") {
+        if (titleOverride) {
+          const aAir = planA(res, params, fast0, null, title);
+          return { title, note: noMethod + "仅空运一种方式可用（不含逾期口径，独立展开）：" + aAir.note, risk: aAir.risk, lines: aAir.lines };
+        }
+        return { title, collapsedTo: "plan2", note: "仅空运一种方式，等价于纯空运分批（口径见时间轴两列）", lines: [] };
+      }
       const a0 = planA(res, params, slow, null, title);
       return { title, note: noMethod + "仅" + slow.m + "一种方式可用，等价于纯" + slow.m + "分批：" + a0.note, risk: a0.risk, lines: a0.lines };
     }
@@ -648,22 +676,48 @@ const ReplenishModule = (function () {
       lines };
   }
 
-  // 方案二（纯空运·分批）：应急/最快基准，仅强制空运，不管其他渠道是否填写。
+  // 方案二（纯空运·含逾期）：应急/最快基准，仅强制空运，不管其他渠道是否填写。
   // 空运未填(0)时回退默认 5 天；首批延后到贴断点（firstBuyDate）。
   function planAir(res, params) {
     const filled = +params.air > 0;
     const airDays = filled ? +params.air : AIR_DEFAULT;
     const airMethod = { m: "空运", d: airDays };
-    const a = planA(res, params, airMethod, null, "方案二（纯空运·分批）");
+    const a = planA(res, params, airMethod, null, "方案二（纯空运·含逾期）");
     const warn = filled ? "" : "（空运运输天数未填写，按默认 " + AIR_DEFAULT + " 天估算）";
-    return { title: "方案二（纯空运·分批）",
+    return { title: "方案二（纯空运·含逾期）",
       note: warn + a.note,
       risk: a.risk, lines: a.lines };
   }
 
   /* ---------- Markdown ---------- */
-  function toMarkdown(res, plans, params) {
+  // 两口径行对齐：按稳定键（kind+到货日+方式+数量）匹配，不再依赖「非 overdue 行索引」——
+  //   防止 analyze 行序将来改动导致两列静默错位；匹配不到时返回 null（该格显示「—」），不静默错配。
+  //   同键多行（同方式同到货同数量）按序消费，显示上等价。toMarkdown 与 UI 层共用。
+  function rowKey(r) { return r.kind + "|" + (+r.arrive) + "|" + (r.method || "") + "|" + r.qty; }
+  function alignNoRows(res, resNo) {
+    const map = new Map();
+    if (!resNo) return map;
+    const byKey = new Map();
+    for (const nr of resNo.rows) {
+      if (nr.kind === "overdue") continue;
+      const k = rowKey(nr);
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k).push(nr);
+    }
+    for (const r of res.rows) {
+      if (r.kind === "overdue") continue;
+      const arr = byKey.get(rowKey(r));
+      map.set(r, (arr && arr.length) ? arr.shift() : null);
+    }
+    return map;
+  }
+
+  function toMarkdown(res, plans, params, resNo) {
     const d = res.d;
+    // 不含逾期口径（方案三）的行 → 时间轴第 6 列；两口径按稳定键一一对应
+    const noMap = alignNoRows(res, resNo);
+    const noOf = r => noMap.get(r) || null;
+    const noMark = r => (r.gap ? " 🔴 " + fmtMD(r.gap.from) + " 起断" : "") + (r.endGap ? " 🔴 " + fmtMD(r.endGap.from) + " 起断（无后续）" : "");
     let md = "===SKU:" + (res.sku.code || "未命名") + "===\n\n";
     md += "**库存状态**：" + res.status + "（" + res.statusNote + "）";
     if (res.trend) md += "；" + res.trend;
@@ -673,21 +727,26 @@ const ReplenishModule = (function () {
       md += res.pickupAlert + (res.overdue.length ? "（存在逾期批次，优先催提）" : "") + "\n\n";
     }
     md += "**库存时间轴**：\n";
-    md += "| 采购 | 方式 | 数量 | 预计到货 | 预计用完 |\n|---|---|---|---|---|\n";
+    md += "| 采购 | 方式 | 数量 | 预计到货 | 预计用完(含逾期) | 预计用完(不含逾期) |\n|---|---|---|---|---|---|\n";
+    const n0 = noOf(res.rows[0]);
     md += "| — | — | 当前库存 " + res.rows[0].qty + " 件 | — | " + fmtMD(res.rows[0].useBy)
       + (res.rows[0].gap ? " 🔴断货 " + fmtMD(res.rows[0].gap.from) + "→" + fmtMD(res.rows[0].gap.to) + " 缺 " + res.rows[0].gap.missQty + " 件" : "")
-      + (res.rows[0].endGap ? " 🔴断货 " + fmtMD(res.rows[0].endGap.from) + " 起（无后续到货）" : "") + " |\n";
+      + (res.rows[0].endGap ? " 🔴断货 " + fmtMD(res.rows[0].endGap.from) + " 起（无后续到货）" : "")
+      + " | " + (n0 ? fmtMD(n0.useBy) + noMark(n0) : "—") + " |\n";
     for (let i = 1; i < res.rows.length; i++) {
       const r = res.rows[i];
       const pd = r.purchaseDate ? fmtMD(parseDate(r.purchaseDate)) : "—";
       let arrive;
-      if (r.kind === "overdue") arrive = fmtMD(r.arrive) + " (逾期未提货)";
+      if (r.kind === "overdue") arrive = fmtMD(r.arrive) + " (逾期未提)";
       else if (r.tight) arrive = fmtMD(r.arrive) + " ⚠️贴线";
       else arrive = fmtMD(r.arrive);
       const gap = r.gap ? " 🔴断货 " + fmtMD(r.gap.from) + "→" + fmtMD(r.gap.to) + " 缺 " + r.gap.missQty + " 件" : "";
       const endM = r.endGap ? " 🔴断货 " + fmtMD(r.endGap.from) + " 起（无后续到货）" : "";
-      md += "| " + pd + " | " + r.method + " | " + r.qty + " | " + arrive + " | " + fmtMD(r.useBy) + gap + endM + " |\n";
+      const nr = noOf(r);
+      const noCell = r.kind === "overdue" ? "不纳入计算" : (nr ? fmtMD(nr.useBy) + noMark(nr) : "—");
+      md += "| " + pd + " | " + r.method + " | " + r.qty + " | " + arrive + " | " + fmtMD(r.useBy) + gap + endM + " | " + noCell + " |\n";
     }
+    md += "\n*口径：含逾期 = 方案一 / 方案二（逾期未提货批次计入库存）；不含逾期 = 方案三（逾期未提货批次不纳入计算）*\n";
     if (res.anomaly.length) {
       md += "\n⚠️ 以下在途批次未纳入计算：\n";
       for (const a of res.anomaly) md += "  - " + (a.method || "未知方式") + " " + a.qty + " 件（" + a.reason + "）\n";
@@ -700,7 +759,7 @@ const ReplenishModule = (function () {
     return md;
   }
 
-  return { parse, analyze, planA, planB, planAir, toMarkdown, fmt, fmtMD, parseDate };
+  return { parse, analyze, planA, planB, planAir, toMarkdown, alignNoRows, fmt, fmtMD, parseDate };
 })();
 
 /* ============================================================
@@ -765,7 +824,7 @@ function renderCalcDoc() {
     [T("陆运 land", "陆运的运输时效（天）"), mth(p.land), "0 = 本次不用该方式"],
     [T("空运 air", "空运的运输时效（天）。填 0 时方案二按默认 5 天估算"), mth(p.air, "；方案二仍按默认 5 天估算"), "0 = 本次不用该方式"],
   ]);
-  h += '<div class="note">三种运输方式<b>默认 海运30天 / 陆运7天 / 空运5天</b>。填 0 = 该渠道本次不用（不参与' + T("方案一（组合）", "主力 = 已启用方式中最慢者；快补 = 主力之外「来得及」的最慢者（优先陆运、其次空运）；三种全 0 时回退海运 30 天") + '）；' + T("方案二恒按空运", "方案二强制只用空运，空运 0 则取默认 5 天（应急基准，与是否填写无关）") + '。</div>';
+  h += '<div class="note">三种运输方式<b>默认 海运30天 / 陆运7天 / 空运5天</b>。填 0 = 该渠道本次不用（不参与' + T("方案一 / 方案三（组合）", "主力 = 已启用方式中最慢者；快补 = 主力之外「来得及」的最慢者（优先陆运、其次空运）；三种全 0 时回退海运 30 天") + '）；' + T("方案二恒按空运", "方案二强制只用空运，空运 0 则取默认 5 天（应急基准，与是否填写无关）") + '。</div>';
   h += '<div class="note">⚠️ 安全库存口径：当前为固定 ' + p.safety + ' 天缓冲，未计入销量波动与运输延误分布。若日销波动大，建议按 Z × σ × √(提前期+运输天数) 估算后回填本参数（待优化）。</div>';
 
   h += "<h3>二、输入字段定义</h3>";
@@ -784,29 +843,34 @@ function renderCalcDoc() {
     [T("单批上限保护（超线拆批）", "海运单批 > 日均×(周期+安全)×2 → 拆成多批；空运/陆运单批 > 日均×(周期+安全) → 拆成多批。口径 = 海运 ≤ 2×(周期+安全) 天量、空运与陆运 ≤ (周期+安全) 天量（旧口语「海运18倍/空运8倍」指日均倍数）；当前参数海运 ≤ " + (p.cycle + p.safety) * 2 + " 天量、空运/陆运 ≤ " + (p.cycle + p.safety) + " 天量。算出的补货量 ≤ 上限 → 一批采购；超过 → 拆多批、在不同采购日滚动下单。工具按周期批/桥接量给单批、天然不越线；仅当把多周期合并成一单下时需主动拆分。<b>例外</b>：快补末批上限 = 单批上限 + 一个安全库存量（见下方「末批上限」）"), "海运 ≤ ⌈d×(cycle+safety)×2⌉；空运/陆运 ≤ ⌈d×(cycle+safety)⌉", "合并大单时拆分"],
     [T("首批采购日 fp（贴断点/锚点）", "首批延后到「关键点 − 安全 − 提前期 − 本渠道运输」，使首批到货日 ≈ 关键点 − 安全，尽量晚下单少占款；该日已过则今天。关键点 = 主力/纯渠道用断点（时间轴首缺口）；阶梯接力快补用该渠道的锚点（见下行「锚点 anchor」，断货中=最早到货日，否则=最早到货日后第一个耗尽日）"), "fp = max(今天, 断点或锚点 − safety − leadTime − 运输)", "断点/锚点 = 已含在途 ETA 的真实缺口起点"],
     [T("桥接量 bridgeQty（快补桥接批）", "快通道（空运/陆运）阶梯接力时每批只买「够撑到货」的量，且不越单批上限：原始值 = ⌈d × (leadTime+safety+本通道运输天数)⌉，实际每批 = min(原始值, 单批上限)。clamp 是末批上界成立的前提——不限桥接量，末批就可能随步长放大"), "min(⌈d×(leadTime+safety+运输)⌉, ⌈d×(cycle+safety)⌉)", "仅快通道阶梯接力使用"],
-    [T("锚点 anchor（快补要接哪一段）", "T = 今天 + leadTime + 本渠道运输（该渠道今天下单能到的最早日）。若 T 这天库存已耗尽 → 锚点 = T（断货已发生，救不回，只能尽早补）；否则 → 锚点 = T 之后第一个「库存耗尽日」。注意不是「最早断货日」：已发生的那段快补无能为力，真正要接的是在途耗尽之后那段。耗尽日取时间轴的 gap.from / endGap.from，不能取任意行「预计用完」（首行是按无在途算的，会误判）"), "projectedStock(T) ≤ 0 ? T : (T 之后第一个耗尽日)", "仅方案一（组合）C 档使用"],
+    [T("锚点 anchor（快补要接哪一段）", "T = 今天 + leadTime + 本渠道运输（该渠道今天下单能到的最早日）。若 T 这天库存已耗尽 → 锚点 = T（断货已发生，救不回，只能尽早补）；否则 → 锚点 = T 之后第一个「库存耗尽日」。注意不是「最早断货日」：已发生的那段快补无能为力，真正要接的是在途耗尽之后那段。耗尽日取时间轴的 gap.from / endGap.from，不能取任意行「预计用完」（首行是按无在途算的，会误判）"), "projectedStock(T) ≤ 0 ? T : (T 之后第一个耗尽日)", "仅组合方案（方案一 / 方案三）C 档使用"],
     [T("末批上限 capLast", "快补末批最多比普通批多买一个安全库存的量（把主力到货时的缓冲补到 safety）。数学保证：末批量 ≤ 桥接量 + 安全库存量 ≤ 单批上限 + 安全库存量，故末批不会失控；超过此界说明链条异常"), "⌈d×(cycle+safety)⌉ + ⌈d×safety⌉", "仅快补末批使用"],
     [T("不可避免断货段", "快补到货日之前的缺口谁都救不了。实际口径取首个断货段 firstGap：起点 = 断点，截止 = min(该段截止日, 快补到货日)（该段截止日通常 = 下一在途到货日；firstGap 为开放式断货时无截止 → 直接到快补到货日），缺量 = ⌈d × 区间天数⌉。若后续在途量太小、耗尽后仍接不上快补，在途耗尽 → 快补到货之间的连续断货不重复单列件数，只由时间轴「🔴断货 MM-DD 起」开放式标注。单独提示并建议催提在途，不会因为要补这段就把快补提前下单"), "区间 = 断点 → min(在途到货日, 快补到货日)", "与快补批次解耦"],
     ["到货日", "采购日 + leadTime + 运输天数", "—"],
     ["预计用完（批次行）", "到货日 + (max(到货时剩余,0) + 本批数量) ÷ d", "断货期库存为 0，缺货不计入消耗"],
-    ["断货判定", "上一段耗尽批「预计用完」< 下一批到货日 → 断货，标注挂在本行（耗尽批）「预计用完」后", "或时间轴末尾耗尽后无后续到货（开放式断货）"],
+    ["断货判定", "上一段耗尽批「预计用完」< 下一批到货日 → 断货，标注挂在本行（耗尽批）「预计用完」后；时间轴两列（含逾期 / 不含逾期）<b>各标本口径的断货</b>，格式一致：区间 = 「🔴断货 MM-DD→MM-DD 缺 N 件」，开放 = 「🔴断货 MM-DD 起（无后续到货）」", "或时间轴末尾耗尽后无后续到货（开放式断货）"],
     [T("缺货件数 missQty", "断货期间损失的销量 ⌈d × 断货天数⌉，属机会成本，不计入库存消耗、不从后续库存扣减"), "⌈d × 断货天数⌉", "断货期损失销量，不扣减库存"],
     [T("贴线", "到货时剩余库存不足 1 天用量，缓冲极薄，轻微延误即断货"), "到货时剩余 < 1 天用量", "红字「⚠️贴线」"],
     ["库存状态", "30 天无断货 = 充足；≤10 天 = 紧急；10–30 天 = 注意", "以时间轴推算为准"],
-    [T("超期在途", "采购距今 > 90 天仍未提货的批次"), "采购 > 90 天未提货", "底部红字列出，忽略不计"],
+    [T("逾期未提货", "预计到货日已过（≤ 今天）但货仍未到、且采购未超 90 天的批次。方案一 / 方案二视为「会到货」计入库存；方案三视为「到不了」不纳入计算"), "预计到货日 ≤ 今天（且采购 ≤ 90 天）", "时间轴「预计到货」列标注；方案三该行「不含逾期」列显示「不纳入计算」"],
+    [T("超期在途", "采购距今 > 90 天仍未提货的批次"), "采购 > 90 天未提货", "底部红字列出，忽略不计（三方案均不计）"],
     [T("异常批次", "无预计到货，或日期非 4 位年份"), "无预计到货 / 日期异常", "底部红字列出，不参与计算"],
   ]);
 
   h += "<h3>四、方案逻辑</h3>";
-  h += "<table><tr><td style='width:26%;font-weight:600'>方案一（组合·推荐）<br><span style='font-weight:400;color:var(--muted)'>可执行</span></td><td>"
+  h += "<table><tr><td style='width:26%;font-weight:600'>方案一（组合·含逾期未提货）<br><span style='font-weight:400;color:var(--muted)'>可执行</span></td><td>"
     + "主力 = " + T("已启用方式中最慢者", "在填了天数(d>0)的方式里取运输最久的；全 0 则回退海运 30 天") + "；快补 = " + T("「来得及」的最慢者", "在主力之外的已启用方式里，按运输天数从慢到快试探。判「来得及」不再要求比锚点早 safety 天：先看「锚点 − 今天 ≥ 提前期 + 该方式运输」→ 够则选它（时间够优先陆运、不够才空运）；若几种方式都够不上，再放宽到「锚点 − 今天 ≥ 该方式运输」（去提前期，只看运输时长）；仍都不行取最快并报断货。判定的锚点统一取各候选共用的标尺 = 最快候选的锚点（快补最早能到那刻起的真实缺口起点；若各候选用自己的锚点，它恒 ≥ 今天+提前期+自身运输，档 1 恒成立、空运永不启用）。没填的方式不参与") + "。<br>先按现有库存+在途判断" + T("是否需要快补", "把现有+在途按到货日推演：先看耗尽日（断点）是否 ≥ 主力首批到货日 → 是则无需快补（A 档）；若断点 < 主力到货日，再看「锚点」（该快补渠道最早到货日之后第一个耗尽日）是否 ≥ 主力到货日 → 是则无需快补（E1，在途已接住）") + "；确实补不上才走" + T("阶梯接力", "快补首批贴锚点延后下单、按桥接量滚动续到主力到货，主力周期批接管，见「五、分情况说明」C 档") + "。分情况见下方说明。</td></tr>"
-    + "<tr><td style='font-weight:600'>方案二（纯空运·分批）<br><span style='font-weight:400;color:var(--muted)'>应急/最快</span></td><td>"
-    + "全部只用" + T("空运", "方案二强制只用空运，空运 0 则取默认 5 天") + "（空运 0 按默认 5 天估算），不管海运/陆运是否填写。每批 = " + T("空运周期批", "⌈d×补货周期⌉，空运快、可高频补，不再叠安全库存") + "，首批贴断点延后，之后每 " + p.cycle + " 天一批。</td></tr></table>";
+    + "<tr><td style='font-weight:600'>方案二（纯空运·含逾期）<br><span style='font-weight:400;color:var(--muted)'>应急/最快</span></td><td>"
+    + "全部只用" + T("空运", "方案二强制只用空运，空运 0 则取默认 5 天") + "（空运 0 按默认 5 天估算），不管海运/陆运是否填写。每批 = " + T("空运周期批", "⌈d×补货周期⌉，空运快、可高频补，不再叠安全库存") + "，首批贴断点延后，之后每 " + p.cycle + " 天一批。口径同方案一：" + T("逾期未提货", "预计到货日已过、货仍未到的批次") + "计入库存。</td></tr>"
+    + "<tr><td style='font-weight:600'>方案三（组合·不含逾期）<br><span style='font-weight:400;color:var(--muted)'>保守</span></td><td>"
+    + "与方案一<b>完全相同</b>的算法（主力/快补/阶梯接力/末批精确缩减），<b>唯一差异</b>是：" + T("逾期未提货", "预计到货日已过（≤ 今天）但货仍未到、且采购未超 90 天的批次") + "视为「到不了」——不并入库存、也不进时间轴，对应时间轴的「预计用完（不含逾期）」列。断货点因此通常更早、更容易触发快补，用于评估「逾期批次一直提不到」的风险。"
+    + "<br>三个边界规则：① 断货点比方案一<b>更早</b>时，说明开头自动给出「断货提前 N 天、主因逾期未提 Z 件」的对照行；② <b>仅空运</b>一种方式时独立展开不含逾期口径的明细（<b>不</b>折叠到含逾期的方案二）；③ SKU <b>无逾期未提批次</b>时与方案一完全一致，折叠为一行提示。</td></tr></table>";
   h += '<div class="note">批次到货间隔 = 补货周期；海运/陆运每批覆盖「周期+安全」天（到货时逐步留出安全垫），空运每批覆盖「周期」天（靠首批到货前已垫的缓冲衔接）。</div>';
   h += '<div class="note">快通道（空运/陆运）阶梯接力时首批' + T("贴锚点", "fp = max(今天, 锚点−safety−leadTime−快补运输)；锚点 = 该渠道今天下单能到的最早日期 T，若 T 时库存已耗尽则锚点=T，否则取 T 之后第一个耗尽日（不是「最早断货日」——已发生的断货快补救不回，真正要接的是在途耗尽之后那段）") + '；<b>第 2 批起</b>每批先按' + T("逐批降级方式", "需求到货日 A = 前批用完日 − safety；在主力之外的已启用方式里按运输天数从慢到快取第一个「今天 ≤ A − (提前期+运输)」的（来得及的最慢者），都不满足取最快并钳今天下单。到货日由需求决定、方式只影响采购日：首批窗口最紧常只能空运，后续批窗口变宽即可降级陆运省运费") + '选定方式，再按该方式的' + T("桥接量（快补桥接批）", "⌈d×(leadTime+safety+本通道运输天数)⌉，且 ≤ 单批上限 ⌈d×(周期+安全)⌉，够衔接即可不囤货") + '；快补<b>首单</b>的预计用完 = 到货日 + (' + T("真实剩余库存", "现有库存 + 在途 − 期间消耗，按时间轴推演；断货期内到货则剩余为 0") + ' + 桥接量) ÷ d，不按安全库存乐观估算。快补<b>末批</b>按需' + T("精确缩减", "末批量 = ⌈d×(主力到货日+安全−末批到货日)⌉ − 末批到货时真实剩余库存（首单=时间轴推演、链上批=safety×d 缓冲），上限 = 单批上限 + 一个安全库存量（末批最多比普通批多买一个 safety 的量把缓冲补到 safety）") + '。</div>';
   h += '<div class="note">' + T("不可避免断货段", "快补到货日之前的缺口谁都救不了：区间 = 断点 → min(在途到货日, 快补到货日)，按日均折算缺货件数，单独提示并建议催提在途；它与快补批次解耦，不会因为要补这段就把快补提前下单") + '。</div>';
+  h += '<div class="note">时间轴两列口径：' + T("预计用完（含逾期）", "方案一 / 方案二的口径：逾期未提货批次计入库存") + ' ｜ ' + T("预计用完（不含逾期）", "方案三的口径：逾期未提货批次不纳入计算，故断货点通常更早") + '。两列' + T("断货标注", "格式一致：区间断货 = 「🔴断货 MM-DD→MM-DD 缺 N 件」（起始日→下次到货日 + 该段缺货件数）；开放式断货 = 「🔴断货 MM-DD 起（无后续到货）」。各列只标本口径推算出的断货。") + '，此处标注即为上方「断货判定 / 缺货件数」两行的呈现。顶部状态徽章与「距缺货 N 天」按含逾期口径。</div>';
 
-  h += "<h3>五、方案一（组合）分情况说明</h3>";
+  h += "<h3>五、组合方案（方案一 / 方案三）分情况说明</h3>";
   h += tbl(["情况", "触发条件", "处理"], [
     [T("A. 主力到货前不断货", "断点 ≥ 主力首批到货日：现有+在途能撑到主力到货（断点 = 时间轴首缺口/耗尽日；主力首批到货日 = 今天 + 提前期 + 主力运输）"),
       "断点 ≥ 主力首批到货日",
@@ -831,6 +895,13 @@ function renderCalcDoc() {
   bindTips(body);
 }
 
+/* 方案悬浮说明：鼠标移到方案标题旁的 ? 上显示（复用 .tip / .tipbox 浮动注释） */
+const PLAN_TIP = {
+  "方案一": "组合方案 · 含逾期未提货口径。逾期未提货批次（预计到货日已过、货仍未到）视为「会到货」，计入库存推演（时间轴「含逾期」列）。主力 = 已启用方式中最慢者；快补 = 主力之外「来得及」的最慢者（优先陆运、其次空运）。先按现有+在途判断是否需要快补：主力到货前不断货 → 直接主力周期批；在途接得住 → 不排快补；都补不上 → 阶梯接力（快补贴锚点延后下单、按桥接量滚动续到主力到货，主力周期批接管）。",
+  "方案二": "纯空运 · 应急/最快基准。全部只用空运（空运填 0 时按默认 5 天估算），不论海运/陆运是否填写。每批 = ⌈日均×补货周期⌉（空运周期批），首批贴断点延后，之后每补货周期一批。逾期口径与方案一相同：逾期未提货计入库存。",
+  "方案三": "组合方案 · 不含逾期口径（保守）。算法与方案一完全相同（主力 / 快补 / 锚点 / 阶梯接力 / 末批精确缩减 全部复用），唯一差异：逾期未提货批次视为「到不了」——不并入库存、也不进时间轴（对应时间轴「不含逾期」列）。因此断货点通常更早、更容易触发快补与更多批次。用于评估「逾期批次一直提不到」的最坏情况：断货点早于方案一时，说明开头自动给出「提前 N 天、主因逾期未提 Z 件」对照。仅空运一种方式时独立展开明细（不折叠到含逾期的方案二）；SKU 无逾期未提批次时与方案一完全一致，折叠为一行提示。",
+};
+
 function run() {
   const out = document.getElementById("output");
   const params = getParams();
@@ -845,8 +916,26 @@ function run() {
   for (const sku of skus) {
     const res = ReplenishModule.analyze(sku, params, base);
     if (res.error) { html += '<div class="sku-card"><div class="err">' + esc(res.error) + "</div></div>"; continue; }
-    const plans = [ReplenishModule.planB(res, params), ReplenishModule.planAir(res, params)];
-    const md = ReplenishModule.toMarkdown(res, plans, params);
+    // 方案三口径：逾期未提货批次视为「到不了」（不并入库存）；行结构与 res 一一对应，供时间轴并排展示两列
+    const resNo = ReplenishModule.analyze(sku, params, base, { excludeOverdue: true });
+    const plans = [
+      ReplenishModule.planB(res, params),
+      ReplenishModule.planAir(res, params),
+      null,
+    ];
+    if (!res.overdue.length) {
+      // 无逾期未提批次 → 两口径推演完全相同，方案三折叠为一行对照提示（不再重复展示明细）
+      plans[2] = { title: "方案三（组合·不含逾期）", note: "无逾期未提批次，与方案一完全一致", lines: [] };
+    } else {
+      plans[2] = ReplenishModule.planB(resNo, params, "方案三（组合·不含逾期）");
+      // 断货点对照：不含逾期断货更早 → note 顶部点明「提前 N 天 + 主因逾期未提 Z 件」
+      const g1 = res.firstGap, g3 = resNo.firstGap;
+      if (g1 && g3 && g3.from < g1.from) {
+        const dd = Math.round((g1.from - g3.from) / 86400000);
+        plans[2].note = "⚠️ 不催提的话，断货提前 " + dd + " 天（" + ReplenishModule.fmtMD(g1.from) + " → " + ReplenishModule.fmtMD(g3.from) + "），主因逾期未提 " + res.overdueQty + " 件：" + plans[2].note;
+      }
+    }
+    const md = ReplenishModule.toMarkdown(res, plans, params, resNo);
     const badge = res.status === "充足" ? "green" : res.status === "注意" ? "orange" : "red";
     tally[res.status] = (tally[res.status] || 0) + 1;
 
@@ -863,23 +952,35 @@ function run() {
       html += '<div class="warn">' + esc(res.pickupAlert) + (res.overdue.length ? "（存在逾期批次，优先催提）" : "") + "</div>";
     }
 
-    html += "<table><tr><th>采购</th><th>方式</th><th>数量</th><th>预计到货</th><th>预计用完</th></tr>";
+    // 不含逾期口径（方案三）的行 → 第 6 列；两口径按稳定键一一对应（alignNoRows）
+    const noMap = ReplenishModule.alignNoRows(res, resNo);
+    // 不含逾期列断货标注：与「含逾期」列完全同格式（起始日→结束日 + 缺货件数 / 开放式断货）
+    const noMark = r => (r.gap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(r.gap.from) + "→" + ReplenishModule.fmtMD(r.gap.to) + " 缺 " + r.gap.missQty + " 件</span>" : "")
+      + (r.endGap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(r.endGap.from) + " 起（无后续到货）</span>" : "");
+    html += "<table><tr><th>采购</th><th>方式</th><th>数量</th><th>预计到货</th><th>预计用完(含逾期)</th><th>预计用完(不含逾期)</th></tr>";
+    const n0 = noMap.get(res.rows[0]) || null;
     html += "<tr><td>—</td><td>—</td><td>当前库存 " + res.rows[0].qty + " 件</td><td>—</td><td>" + ReplenishModule.fmtMD(res.rows[0].useBy)
       + (res.rows[0].gap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(res.rows[0].gap.from) + "→" + ReplenishModule.fmtMD(res.rows[0].gap.to) + " 缺 " + res.rows[0].gap.missQty + " 件</span>" : "")
-      + (res.rows[0].endGap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(res.rows[0].endGap.from) + " 起（无后续到货）</span>" : "") + "</td></tr>";
+      + (res.rows[0].endGap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(res.rows[0].endGap.from) + " 起（无后续到货）</span>" : "")
+      + "</td><td>" + (n0 ? ReplenishModule.fmtMD(n0.useBy) + noMark(n0) : "—") + "</td></tr>";
     for (let i = 1; i < res.rows.length; i++) {
       const r = res.rows[i];
       const pd = r.purchaseDate ? ReplenishModule.fmtMD(ReplenishModule.parseDate(r.purchaseDate)) : "—";
       let arrive;
-      if (r.kind === "overdue") arrive = '<td>' + ReplenishModule.fmtMD(r.arrive) + ' <span style="color:var(--red)">(逾期未提货)</span></td>';
+      if (r.kind === "overdue") arrive = '<td>' + ReplenishModule.fmtMD(r.arrive) + ' <span style="color:var(--red)">(逾期未提)</span></td>';
       else if (r.tight) arrive = '<td class="gap">' + ReplenishModule.fmtMD(r.arrive) + " ⚠️贴线</td>";
       else arrive = "<td>" + ReplenishModule.fmtMD(r.arrive) + "</td>";
       const useByStr = ReplenishModule.fmtMD(r.useBy);
       const gapMark = r.gap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(r.gap.from) + "→" + ReplenishModule.fmtMD(r.gap.to) + " 缺 " + r.gap.missQty + " 件</span>" : "";
       const endMark = r.endGap ? ' <span style="color:var(--red);font-weight:600">🔴断货 ' + ReplenishModule.fmtMD(r.endGap.from) + " 起（无后续到货）</span>" : "";
-      html += "<tr><td>" + pd + "</td><td>" + esc(r.method) + "</td><td>" + r.qty + "</td>" + arrive + "<td>" + useByStr + gapMark + endMark + "</td></tr>";
+      const nr = noMap.get(r) || null;
+      const noCell = r.kind === "overdue"
+        ? '<span style="color:var(--muted)">不纳入计算</span>'
+        : (nr ? ReplenishModule.fmtMD(nr.useBy) + noMark(nr) : "—");
+      html += "<tr><td>" + pd + "</td><td>" + esc(r.method) + "</td><td>" + r.qty + "</td>" + arrive + "<td>" + useByStr + gapMark + endMark + "</td><td>" + noCell + "</td></tr>";
     }
     html += "</table>";
+    html += '<div style="font-size:12px;color:var(--muted);margin:-4px 0 6px">口径：含逾期 = 方案一 / 方案二（逾期未提货批次计入库存）；不含逾期 = 方案三（逾期未提货批次不纳入计算）</div>';
     if (res.anomaly.length) {
       html += '<div class="warn">⚠️ 以下 ' + res.anomaly.length + ' 批在途未纳入计算：</div><ul style="color:#d93025;font-size:13px;margin:2px 0 0 18px;padding:0">';
       for (const a of res.anomaly) html += "<li>" + esc(a.method || "未知方式") + " " + a.qty + " 件（" + esc(a.reason) + "）</li>";
@@ -887,7 +988,10 @@ function run() {
     }
 
     for (const p of plans) {
-      html += '<div class="plan"><h4>' + esc(p.title) + "</h4>";
+      const tipTxt = PLAN_TIP[p.title.slice(0, 3)] || "";
+      html += '<div class="plan"><h4>' + esc(p.title)
+        + (tipTxt ? ' <span class="tip q" data-tip="' + esc(tipTxt) + '">?</span>' : "")
+        + "</h4>";
       html += '<div class="note">' + esc(p.note) + "</div>";
       if (p.risk) html += '<div class="note risk">' + esc(p.risk) + "</div>";
       if (p.lines.length) {
@@ -914,6 +1018,7 @@ function run() {
     + '<button class="copy-btn" onclick="toggleAll(true)">全部展开</button>'
     + '<button class="copy-btn" onclick="toggleAll(false)">全部收起</button></div>';
   out.innerHTML = bar + html;
+  bindTips(out);
 }
 
 function toggleAll(open) {
