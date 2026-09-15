@@ -90,6 +90,17 @@
   .plan li { font-size:13px; font-family:ui-monospace,Consolas,monospace; }
   .copy-btn { font-size:12px; padding:3px 10px; margin-left:8px; }
   .err { color:var(--red); padding:10px; }
+  /* 无法计算的卡片：把输入原文逐行列出来（2026-09-15），别只留一行错误提示 */
+  .echo-h { color:var(--muted); font-size:12.5px; margin:6px 0 2px; }
+  table.echo-t { margin:2px 0 0; font-size:12.5px; }
+  .echo-t td { border:0; border-top:1px solid var(--line); padding:3px 6px; vertical-align:top; }
+  .echo-t tr:first-child td { border-top:0; }
+  .echo-t td:first-child { width:16px; text-align:center; font-weight:700; }
+  .echo-t td:nth-child(2) { font-family:ui-monospace,Consolas,monospace; white-space:pre-wrap; }
+  .echo-t td:last-child { text-align:right; white-space:nowrap; }
+  .echo-c { color:var(--green); } .echo-yes { color:var(--green); }
+  .echo-o { color:var(--orange); } .echo-soft { color:var(--orange); }
+  .echo-x { color:#c3c7cd; } .echo-no { color:#c3c7cd; }
   details.panel summary { cursor:pointer; font-weight:600; font-size:14px; outline:none; }
   details.panel[open] summary { margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--line); }
   .doc h3 { font-size:14px; margin:18px 0 6px; padding-top:6px; border-top:1px solid var(--line); }
@@ -1192,6 +1203,56 @@ function buildRail() {
 // #output 重建后统一要做的事：导航项、锚点表、高亮（force 跳过节流，渲染完立刻定一次）
 function afterRender() { buildRail(); refreshTargets(); onScroll(true); }
 
+/* —— 无法计算的卡片：把输入原文列出来（09-15）——
+   字段正则与 ReplenishModule.parseOne 保持一致（那边改字段名时，这里要跟着改；两处都只读不改数据）。
+   「读了不用」= 解析器会读进对象、但不进补货公式的两个字段：日均30天（只在状态行显示）、
+   可售天数（页面改用 可用库存 ÷ 日均 重算）。 */
+const ECHO_FIELDS = [
+  [/^SKU\s*[：:]\s*(\S+)/, "编码", 0],
+  [/日均7天\s*[：:]\s*([\d.]+)/, "日均7天", 0],
+  [/日均30天\s*[：:]\s*([\d.]+)/, "日均30天", 1],
+  [/日均变化率\s*[：:]\s*([+\-]?[\d.]+)/, "日均变化率", 1],
+  [/可用库存\s*[：:]\s*([\d.]+)/, "可用库存", 0],
+  [/可售天数\s*[：:]\s*([\d.]+)/, "可售天数", 1],
+  [/销量7天\s*[：:]\s*([\d.]+)/, "销量7天", 0],
+  [/^\s*[-*]\s*[^：:\s]+\s*[：:]\s*在途\s*\d+\s*件/, "在途批次", 0],
+];
+function splitBlocks(text) {
+  return String(text).split(/===SKU/i)
+    .map(p => p.replace(/^[：:]\s*\S+\s*=*/, "").trim()).filter(Boolean);
+}
+function blockCode(block) {
+  for (const raw of String(block).split("\n")) {
+    const m = raw.trim().match(/^SKU\s*[：:]\s*(\S+)/);
+    if (m) return m[1];
+  }
+  return "";
+}
+function renderEchoBody(errMsg, block) {
+  const lines = String(block || "").split("\n").map(x => x.trim()).filter(Boolean);
+  let unread = 0;
+  let rows = "";
+  for (const ln of lines) {
+    let hit = null;
+    for (const [re, label, soft] of ECHO_FIELDS) {
+      if (re.test(ln)) { hit = { label, soft }; break; }
+    }
+    if (!hit) {
+      unread++;
+      rows += '<tr><td class="echo-x">·</td><td>' + esc(ln) + '</td><td class="echo-no">没这个字段，不参与计算</td></tr>';
+    } else if (hit.soft) {
+      rows += '<tr><td class="echo-o">✓</td><td>' + esc(ln) + '</td><td class="echo-soft">读到了，但不进补货公式（仅参考）</td></tr>';
+    } else {
+      rows += '<tr><td class="echo-c">✓</td><td>' + esc(ln) + '</td><td class="echo-yes">参与计算 · ' + esc(hit.label) + "</td></tr>";
+    }
+  }
+  let h = '<div class="sku-body">';
+  h += '<div class="err">' + esc(errMsg) + "</div>";
+  if (!lines.length) return h + '<div class="note">（这块没读到任何输入行）</div></div>';
+  h += '<div class="echo-h">输入原文共 ' + lines.length + " 行" + (unread ? "，其中 " + unread + " 行工具不认（不影响其他 SKU）" : "") + "</div>";
+  return h + '<table class="echo-t">' + rows + "</table></div>";
+}
+
 function run() {
   const out = document.getElementById("output");
   snapshotOpen();      // 先把当前展开/收起状态抄回来（重建后按它回填）
@@ -1211,18 +1272,30 @@ function run() {
   const tally = { 紧急: 0, 注意: 0, 充足: 0, 异常: 0 };
   let html = "";
   let skuIdx = -1;                                  // 给每张卡片发一个稳定 id（导航锚点 + 开合状态键）
+  // 「无法计算」的卡片要把输入原样列出来（09-15 用户令：不要直接空白的）。
+  //   只在渲染层自己按 ===SKU 切块 + 用与解析器同一套字段正则判断每行有没有被读走，
+  //   不去动 ReplenishModule（保持算法零改动）。blockUsed 让重复编码也能按顺序对上。
+  const blocks = splitBlocks(text), blockUsed = blocks.map(() => false);
+  function takeBlock(code) {
+    let i = blocks.findIndex((b, j) => !blockUsed[j] && blockCode(b) === (code || ""));
+    if (i < 0) i = blocks.findIndex((b, j) => !blockUsed[j]);
+    if (i < 0) return "";
+    blockUsed[i] = true; return blocks[i];
+  }
   for (const sku of skus) {
     skuIdx++;
     const ckey = "sku-" + skuIdx;
+    const rawBlock = takeBlock(sku.code);            // 每个 SKU 都认领一块，指针才不会错位
     const res = ReplenishModule.analyze(sku, params, base);
     if (res.error) {
-      // 无法计算的 SKU 也是一张卡片：进导航（灰色圆点）、和别的卡片一样能展开
+      // 无法计算的 SKU 也是一张卡片：进导航（灰色圆点）、默认同样展开，里面列出输入原文
       tally.异常++;
       html += '<details class="sku-card disc" id="' + ckey + '" data-ckey="' + ckey + '" data-sku="' + esc(sku.code || "") + '"'
-        + (cardOpen[ckey] ? " open" : "") + ">";
+        + (cardOpen[ckey] === false ? "" : " open") + ">";
       html += '<summary><span class="sku-title">' + esc(sku.code || "未命名") + "</span>"
         + TT('<span class="badge gray">无法计算</span>', "日均 7 天缺失或为 0，无法推演库存 → 该 SKU 不参与本次任何计算") + "</summary>";
-      html += '<div class="sku-body"><div class="err">' + esc(res.error) + "</div></div></details>";
+      html += renderEchoBody(res.error, rawBlock);
+      html += "</details>";
       continue;
     }
     // 方案三口径：逾期未提货批次视为「到不了」（不并入库存）；行结构与 res 一一对应，供时间轴并排展示两列
@@ -1248,8 +1321,8 @@ function run() {
     const badge = res.status === "充足" ? "green" : res.status === "注意" ? "orange" : "red";
     tally[res.status] = (tally[res.status] || 0) + 1;
 
-    // 默认收起（状态按卡片序号记，重新分析不重置），点击标题展开/收起
-    html += '<details class="sku-card disc" id="' + ckey + '" data-ckey="' + ckey + '" data-sku="' + esc(sku.code || "") + '"' + (cardOpen[ckey] ? " open" : "") + ">";
+    // 默认展开（09-15 用户令：SKU 卡片默认展开；方案块仍默认收起 → 两段式）。手动收起的才记 false
+    html += '<details class="sku-card disc" id="' + ckey + '" data-ckey="' + ckey + '" data-sku="' + esc(sku.code || "") + '"' + (cardOpen[ckey] === false ? "" : " open") + ">";
     html += '<summary><span class="sku-title">' + esc(sku.code || "未命名") + '</span>'
       + TT('<span class="badge ' + badge + '">' + res.status + "</span>", "30 天内无断货 = 充足；距缺货 ≤ 10 天 = 紧急；10–30 天 = 注意（按含逾期口径的时间轴推算）");
     html += '<span class="sum-meta">' + esc(res.statusNote) + " ｜ 日均7天 " + sku.daily7 + " ｜ 可用 " + res.rows[0].qty + " 件"
