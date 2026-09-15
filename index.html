@@ -1082,12 +1082,13 @@ const PLAN_TIP = {
 };
 
 /* —— 可折叠块的状态（2026-09-14）——
-   方案块默认展开、SKU 卡片默认收起；开合状态记在这两个对象里（缺省值即默认态）。
+   方案块与 SKU 卡片**都默认收起**（09-15：方案块从默认展开改成默认收起）；开合状态记在这两个对象里
+   （缺省值即默认态）。
    ⚠️ 键用卡片序号（sku-N）而不是 SKU 编码：同一份数据里编码可能重复，用编码当键会让
       两张卡片共用一个状态（实测：收起第一张、重新分析后两张都变成展开）。
    run() 每次重建 #output，渲染时按这里的值回填 open —— 点过「分析」不会把用户
    手动展开/收起的状态重置掉。 */
-const planOpen = {};   // 键 = sku-N + "|" + 方案名，缺省 = 展开
+const planOpen = {};   // 键 = sku-N + "|" + 方案名，缺省 = 收起（只有点开的才记 true）
 const cardOpen = {};   // 键 = sku-N，缺省 = 收起
 function allDiscs() { return Array.prototype.slice.call(document.querySelectorAll("#output details.disc")); }
 // 一个可折叠块的存储位置：方案块 = planOpen[sku-N|方案名]，卡片 = cardOpen[sku-N]
@@ -1317,7 +1318,7 @@ function run() {
       // 2026-09-14：方案块可点击收起，收起只留标题行（note / 风险 / 批次行都进 body）。
       //   展开状态记在 planOpen 里（重新「分析」后会重建 DOM，靠它回填，不会被重置）。
       html += '<details class="plan disc" data-pkey="' + esc(pkey) + '" data-ckey="' + ckey + '" data-sku="' + esc(sku.code || "") + '"'
-        + (planOpen[pStoreKey] !== false ? " open" : "") + ">";
+        + (planOpen[pStoreKey] === true ? " open" : "") + ">";   // 默认收起（09-15 改），点开的才记住展开
       html += "<summary><h4>" + esc(p.title)
         + (tipTxt ? ' <span class="tip q" data-tip="' + esc(tipTxt) + '">?</span>' : "")
         + "</h4></summary>";
