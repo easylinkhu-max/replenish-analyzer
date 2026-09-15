@@ -14,7 +14,29 @@
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text);
     font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; font-size:14px; line-height:1.6; }
-  .wrap { max-width: 980px; margin:0 auto; padding:24px 16px 60px; }
+  /* 两栏：左侧导航（sticky）+ 内容。max-width 放大到 1160，内容列维持 ~980 */
+  .wrap { max-width:1160px; margin:0 auto; padding:24px 16px 60px;
+    display:grid; grid-template-columns:156px minmax(0,1fr); gap:20px; align-items:start; }
+  /* 左侧导航（sticky 竖条；SKU 多时自身滚动） */
+  .rail { position:sticky; top:16px; align-self:start; max-height:calc(100vh - 32px);
+    overflow-y:auto; font-size:13px; padding:2px 0 8px; }
+  .rail a { display:block; padding:5px 8px; color:var(--muted); text-decoration:none;
+    border-left:2px solid transparent; border-radius:0 6px 6px 0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rail a:hover { background:#e9edf2; color:var(--text); }
+  .rail a.active { color:var(--blue); font-weight:600; border-left-color:var(--blue); background:#f2f6ff; }
+  .rail a.disabled { color:#c3c7cd; pointer-events:none; }
+  .rail .rail-group { color:var(--muted); font-size:12px; font-weight:600; padding:8px 8px 2px; }
+  .rail a .dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  @media (max-width:1080px) {
+    .wrap { grid-template-columns:1fr; }
+    .rail { position:sticky; top:0; z-index:20; max-height:none; display:flex; flex-wrap:wrap;
+      gap:6px; padding:8px 0; margin-bottom:4px; background:var(--bg); border-bottom:1px solid var(--line); }
+    .rail a { border-left:0; border:1px solid var(--line); border-radius:6px; background:var(--card); padding:5px 10px; }
+    .rail .rail-group { display:none; }
+    #rail-skus { display:flex; flex-wrap:wrap; gap:6px; }
+  }
+  @media print { .rail { display:none; } .wrap { grid-template-columns:1fr; } }
   h1 { font-size:20px; margin:0 0 4px; }
   .sub { color:var(--muted); font-size:12px; margin-bottom:16px; }
   .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
@@ -28,14 +50,16 @@
     cursor:pointer; font-size:14px; }
   button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
   button:hover { opacity:.9; }
+  /* 可折叠块（SKU 卡片 / 方案块）共用的标题行行为：▸▾ 三角 + hover 底色 + 去原生 marker */
+  details.disc > summary { cursor:pointer; list-style:none; user-select:none; }
+  details.disc > summary::-webkit-details-marker { display:none; }
+  details.disc > summary::before { content:"▸"; color:var(--muted); font-size:12px; width:10px; display:inline-block; }
+  details.disc[open] > summary::before { content:"▾"; }
+  details.disc > summary:hover { background:#fafbfc; }
   .sku-card { background:var(--card); border:1px solid var(--line); border-radius:10px;
     margin-bottom:12px; overflow:hidden; }
-  details.sku-card > summary { cursor:pointer; padding:12px 16px; display:flex; align-items:center;
-    gap:10px; flex-wrap:wrap; list-style:none; user-select:none; }
-  details.sku-card > summary::-webkit-details-marker { display:none; }
-  details.sku-card > summary::before { content:"▸"; color:var(--muted); font-size:12px; width:10px; }
-  details.sku-card[open] > summary::before { content:"▾"; }
-  details.sku-card > summary:hover { background:#fafbfc; }
+  details.sku-card > summary { padding:12px 16px; display:flex; align-items:center;
+    gap:10px; flex-wrap:wrap; }
   details.sku-card[open] > summary { border-bottom:1px solid var(--line); }
   .sku-body { padding:10px 16px 16px; }
   .sum-meta { color:var(--muted); font-size:12px; }
@@ -47,6 +71,7 @@
   .badge.green { background:var(--green); }
   .badge.orange { background:var(--orange); }
   .badge.red { background:var(--red); }
+  .badge.gray { background:#9aa0a6; }   /* 无法计算的 SKU（日均缺失）*/
   .status-line { color:var(--muted); font-size:13px; margin-bottom:10px; }
   .warn { color:var(--red); font-size:13px; margin:6px 0; }
   table { width:100%; border-collapse:collapse; font-size:13px; margin:10px 0; }
@@ -54,7 +79,11 @@
   th { background:#fafbfc; font-weight:600; }
   td.gap { color:var(--red); font-weight:600; }
   .plan { border-left:3px solid var(--line); padding:8px 12px; margin:10px 0; background:#fafbfc; border-radius:6px; }
+  /* 方案块本身可折叠（2026-09-14）：收起只留标题行；note/风险/批次行都进 body */
+  details.plan > summary { display:flex; align-items:center; gap:2px; }
   .plan h4 { margin:0 0 4px; font-size:14px; }
+  details.plan > summary h4 { margin:0; }
+  details.plan > summary:hover { background:#eef1f5; }
   .plan .note { color:var(--muted); font-size:12px; margin:4px 0; }
   .plan .note.risk { color:var(--red); }
   .plan ol { margin:4px 0; padding-left:18px; }
@@ -84,10 +113,19 @@
 </head>
 <body data-page-node-id="kB9duiHPxTMY9ronu84iuf">
 <div class="wrap" data-page-node-id="D5BO0NMeiDA7ae892aEU4g">
+  <nav class="rail" id="rail" aria-label="页面导航" data-page-node-id="nAvRaiL0000000000001">
+    <a href="#sec-settings" data-jump="sec-settings" data-page-node-id="nAvSet00000000000001">设置</a>
+    <a href="#calc-doc" data-jump="calc-doc" data-page-node-id="nAvAlg00000000000001">算法</a>
+    <a href="#sec-input" data-jump="sec-input" data-page-node-id="nAvInp00000000000001">输入框</a>
+    <a href="#sec-overview" data-jump="sec-overview" id="rail-overview" class="disabled" data-page-node-id="nAvOvw00000000000001">概况</a>
+    <div class="rail-group" data-page-node-id="nAvGrp00000000000001">具体SKU</div>
+    <div id="rail-skus" data-page-node-id="nAvSku00000000000001"></div>
+  </nav>
+  <div class="main" data-page-node-id="mAiN000000000000001">
   <h1 data-page-node-id="YuuHRAZjW5J1qHSCl9mVCK">补货分析模块</h1>
   <div class="sub" data-page-node-id="RzNN1Dia6H6R0imiSYuIes">粘贴 SKU 数据 → 点「分析」→ 本地计算输出时间轴 + 三方案，零 AI 调用</div>
 
-  <div class="panel" data-page-node-id="DF2gZwwtz4OjTap4lOH2At">
+  <div class="panel" id="sec-settings" data-page-node-id="DF2gZwwtz4OjTap4lOH2At">
     <div class="params" oninput="renderCalcDoc()" onchange="renderCalcDoc()" data-page-node-id="k2AeUAvl2n1VfXiqvpFRj4">
       <label data-page-node-id="4PPQ9Mv1fzR8SoVX6qULgO"><span class="tip" data-tip="补货周期 cycle：相邻两批的采购间隔天数，同时是单批覆盖天数的基准（每批覆盖「周期+安全」天）">补货周期(天)</span><input id="p-cycle" type="number" value="7" data-page-node-id="v6CD34ChavPwaQf8BxILpG"></label>
       <label data-page-node-id="WwFJWL6JOOe9NT3U9JhvQZ"><span class="tip" data-tip="采购提前期 leadTime：下单之后、供应商实际发货之间的准备天数（备货、报关等）。档1 判据含它，档2（需紧急采购）跳过它">采购提前期(天)</span><input id="p-lead" type="number" value="2" data-page-node-id="A2KMvz3bqDIgj95suH3Cyk"></label>
@@ -104,7 +142,7 @@
     <div id="calc-doc-body" data-page-node-id="a6jXPcYlDx7jBTfd19pAPV"></div>
   </details>
 
-  <div class="panel" data-page-node-id="dfH0PQrb13oTZ0jORZIlf7">
+  <div class="panel" id="sec-input" data-page-node-id="dfH0PQrb13oTZ0jORZIlf7">
     <textarea id="input" placeholder="在此粘贴 SKU 数据，多个 SKU 用 ===SKU:编码=== 分隔"></textarea>
     <div class="btns" data-page-node-id="6wG3cHMF5EqmDYu4TmQkFc">
       <button class="primary" onclick="run()" data-page-node-id="QorOmqLyCFZTeQZ1sXjPi9">分析</button>
@@ -114,6 +152,7 @@
   </div>
 
   <div id="output" data-page-node-id="QN7WyKwTq0xWElsASTKMdx"></div>
+  </div><!-- /.main -->
 </div>
 
 <script>
@@ -840,6 +879,11 @@ function bindTips(rootEl) {
     el.addEventListener("mouseleave", function () { if (el._box) { el._box.remove(); el._box = null; } });
   });
 }
+/* 点 .tip 不该有副作用：方案标题旁的 ? 就坐在 <summary> 里，不拦一下的话点它会连带把整块
+   折叠起来（实测 open true → false）。.tip 本身没有默认行为，拦在文档层对其他位置无影响。 */
+document.addEventListener("click", function (e) {
+  if (e.target.closest && e.target.closest(".tip")) e.preventDefault();
+});
 
 
 /* 计算说明面板（§9.3 一级/二级标题重组）：
@@ -1037,20 +1081,149 @@ const PLAN_TIP = {
   "方案三": "组合方案 · 不含逾期口径（保守）。算法与方案一完全相同（主力 / 快补 / 逐缺口迭代 / 终点 全部复用），唯一差异：逾期未提货批次视为「到不了」——不并入库存、也不进时间轴（对应时间轴「不含逾期」列）。因此断货点通常更早、更容易触发快补与更多批次。用于评估「逾期批次一直提不到」的最坏情况：断货点早于方案一时，说明开头自动给出「提前 N 天、主因逾期未提 Z 件」对照。仅空运一种方式时独立展开明细（不折叠到含逾期的方案二）；SKU 无逾期未提批次时与方案一完全一致，折叠为一行提示。",
 };
 
+/* —— 可折叠块的状态（2026-09-14）——
+   方案块默认展开、SKU 卡片默认收起；开合状态记在这两个对象里（缺省值即默认态）。
+   ⚠️ 键用卡片序号（sku-N）而不是 SKU 编码：同一份数据里编码可能重复，用编码当键会让
+      两张卡片共用一个状态（实测：收起第一张、重新分析后两张都变成展开）。
+   run() 每次重建 #output，渲染时按这里的值回填 open —— 点过「分析」不会把用户
+   手动展开/收起的状态重置掉。 */
+const planOpen = {};   // 键 = sku-N + "|" + 方案名，缺省 = 展开
+const cardOpen = {};   // 键 = sku-N，缺省 = 收起
+function allDiscs() { return Array.prototype.slice.call(document.querySelectorAll("#output details.disc")); }
+// 一个可折叠块的存储位置：方案块 = planOpen[sku-N|方案名]，卡片 = cardOpen[sku-N]
+function discState(d) {
+  const ck = d.getAttribute("data-ckey");
+  if (!ck) return null;
+  const pk = d.getAttribute("data-pkey");
+  return pk ? { store: planOpen, key: ck + "|" + pk } : { store: cardOpen, key: ck };
+}
+function recordOpen(d) { const st = discState(d); if (st) st.store[st.key] = d.open; }
+function bindDisc() {
+  allDiscs().forEach(function (d) { d.addEventListener("toggle", function () { recordOpen(d); }); });
+}
+// 重建前先把当前 DOM 的开合状态抄回来：toggle 事件是「异步派发」的，同一个任务里改了 open
+//   又立刻重新渲染（程序化调用、或点得很快）时监听器还没跑，状态会丢 —— 渲染前抄一次最稳。
+function snapshotOpen() { allDiscs().forEach(recordOpen); }
+
+/* —— 左侧导航：滚动高亮 + 点击跳转（2026-09-14）——
+   锚点分布：设置 #sec-settings / 算法 #calc-doc / 输入框 #sec-input / 概况 #sec-overview
+             / 每个 SKU 卡片 #sku-N（后两个在 #output 里，每次 run() 重建 → 每次重取） */
+let spyAt = 0, railTargets = [];
+function refreshTargets() {
+  const ids = ["sec-settings", "calc-doc", "sec-input", "sec-overview"]
+    .concat(Array.prototype.slice.call(document.querySelectorAll("#output details.sku-card")).map(c => c.id));
+  railTargets = ids.map(id => ({ id: id, el: document.getElementById(id) })).filter(t => t.el);
+  const ov = document.getElementById("rail-overview");
+  if (ov) ov.classList.toggle("disabled", !document.getElementById("sec-overview"));
+}
+function setActive(id) {
+  Array.prototype.forEach.call(document.querySelectorAll(".rail a[data-jump]"), function (a) {
+    a.classList.toggle("active", a.getAttribute("data-jump") === id);
+  });
+}
+// 跳转落点要避开的吸顶高度：宽屏导航是左列（不遮内容）= 0；窄屏导航变成顶部条（实测约 50px）
+function stickyTop() {
+  return window.innerWidth <= 1080 ? Math.round(document.getElementById("rail").getBoundingClientRect().height) : 0;
+}
+function onScroll(force) {
+  // 时间戳节流（不用 rAF：窗口被节流/后台时 rAF 不回调，锁会一直挂着、高亮从此不动）
+  const now = Date.now();
+  if (!force && now - spyAt < 50) return;
+  spyAt = now;
+  if (!railTargets.length) return;
+  /* 判据（2026-09-15 改）：在「视口顶部 → 40% 高」这条带子里，占带子最长的那个区块 = 当前区块。
+     原来的「固定 24px 越线 + 到底强制亮最后一项」有两个实测问题：
+       ① 卡片收起时整页只比视口高 351px，概况与 5 张卡片的起点都在 400px 以下 →
+          那段内容明明看得见，导航却一次都亮不到；
+       ② 一旦满足「到底」就把高亮写成最后一项，会盖掉用户刚点的那一项
+          （实测：点第 3 项 JIN-ym → 800ms 后高亮自己变成 kaerd）。
+     带子占比在两页都成立：高页面里等价于原来的越线判定，矮页面里也能选中正在看的那一段。 */
+  const band = Math.max(240, Math.round(window.innerHeight * 0.4));
+  let cur = railTargets[0].id, best = -Infinity;
+  for (const t of railTargets) {
+    const r = t.el.getBoundingClientRect();
+    const len = Math.min(band, r.bottom) - Math.max(0, r.top);   // 该区块占带子多长（可为负 = 完全不在带内）
+    if (len > best) { best = len; cur = t.id; }
+  }
+  setActive(cur);
+}
+function jumpTo(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (id === "calc-doc") el.open = true;   // 「算法」是折叠面板，先展开再跳，否则只看到一行标题
+  // SKU 卡片收起时只有 51px 一行标题，光滚过去等于什么都没看到 → 顺手展开这张
+  if (el.classList.contains("sku-card")) el.open = true;
+  // 直接落位（不用 behavior:"smooth"）：平滑滚动是帧动画，在被节流/无帧的环境里会走不动或走过头，
+  //   落点不可控；瞬移虽然少一点动效，但每次都能停在标题正下方，体验反而更稳。
+  const y = Math.max(0, el.getBoundingClientRect().top + window.scrollY - stickyTop() - 12);
+  window.scrollTo(0, y);
+  setActive(id);                            // 高亮跟着点，不等 scroll 事件（事件可能不派发）
+}
+// 事件委托：SKU 导航项是动态生成的，绑在 .rail 上一次即可
+document.getElementById("rail").addEventListener("click", function (e) {
+  const a = e.target.closest && e.target.closest("a[data-jump]");
+  if (!a || a.classList.contains("disabled")) return;
+  e.preventDefault();
+  jumpTo(a.getAttribute("data-jump"));
+});
+window.addEventListener("scroll", function () { onScroll(); }, { passive: true });
+window.addEventListener("resize", function () { onScroll(); });
+window.addEventListener("load", function () { onScroll(); });   // 首屏布局完成后再定一次高亮（rAF 可能早于布局）
+// 兜底轮询（500ms / 十几个元素读一次坐标，开销可忽略）：滚动事件偶发不派发（程序化滚动、
+// 自动化截图等）+ 展开/收起改变了元素位置时，高亮也能自己纠正回来
+setInterval(function () { onScroll(); }, 500);
+
+/* —— 具体SKU 导航项：每个 SKU 一条（带状态圆点），点它滚到那张卡片（并展开它）—— */
+function buildRail() {
+  const box = document.getElementById("rail-skus");
+  if (!box) return;
+  const cards = Array.prototype.slice.call(document.querySelectorAll("#output details.sku-card"));
+  box.innerHTML = cards.map(function (c) {
+    const name = c.getAttribute("data-sku") || c.id;
+    const b = c.querySelector(".badge");
+    const color = !b || b.classList.contains("gray") ? "var(--muted)"   // 无法计算的 SKU = 灰点
+      : b.classList.contains("red") ? "var(--red)"
+      : b.classList.contains("orange") ? "var(--orange)" : "var(--green)";
+    return '<a href="#' + c.id + '" data-jump="' + c.id + '" title="' + esc(name) + '">'
+      + '<i class="dot" style="background:' + color + '"></i>' + esc(name) + "</a>";
+  }).join("");
+}
+// #output 重建后统一要做的事：导航项、锚点表、高亮（force 跳过节流，渲染完立刻定一次）
+function afterRender() { buildRail(); refreshTargets(); onScroll(true); }
+
 function run() {
   const out = document.getElementById("output");
+  snapshotOpen();      // 先把当前展开/收起状态抄回来（重建后按它回填）
   const params = getParams();
   const base = getBaseDate();
   const text = document.getElementById("input").value;
   renderCalcDoc();
   const skus = ReplenishModule.parse(text);
-  if (!skus.length) { out.innerHTML = '<div class="err">未识别到 SKU 数据，请检查输入格式。</div>'; return; }
+  if (!skus.length) {
+    // 没解析出任何 SKU：输出区只剩一句错误提示，导航必须跟着清空 —— 否则上一轮的 SKU 项会变成
+    // 「幽灵项」（锚点已从文档里移除，点了不跳、高亮还卡死在最后一项，实测过）
+    out.innerHTML = '<div class="err">未识别到 SKU 数据，请检查输入格式。</div>';
+    bindDisc(); afterRender();
+    return;
+  }
 
-  const tally = { 紧急: 0, 注意: 0, 充足: 0 };
+  const tally = { 紧急: 0, 注意: 0, 充足: 0, 异常: 0 };
   let html = "";
+  let skuIdx = -1;                                  // 给每张卡片发一个稳定 id（导航锚点 + 开合状态键）
   for (const sku of skus) {
+    skuIdx++;
+    const ckey = "sku-" + skuIdx;
     const res = ReplenishModule.analyze(sku, params, base);
-    if (res.error) { html += '<div class="sku-card"><div class="err">' + esc(res.error) + "</div></div>"; continue; }
+    if (res.error) {
+      // 无法计算的 SKU 也是一张卡片：进导航（灰色圆点）、和别的卡片一样能展开
+      tally.异常++;
+      html += '<details class="sku-card disc" id="' + ckey + '" data-ckey="' + ckey + '" data-sku="' + esc(sku.code || "") + '"'
+        + (cardOpen[ckey] ? " open" : "") + ">";
+      html += '<summary><span class="sku-title">' + esc(sku.code || "未命名") + "</span>"
+        + TT('<span class="badge gray">无法计算</span>', "日均 7 天缺失或为 0，无法推演库存 → 该 SKU 不参与本次任何计算") + "</summary>";
+      html += '<div class="sku-body"><div class="err">' + esc(res.error) + "</div></div></details>";
+      continue;
+    }
     // 方案三口径：逾期未提货批次视为「到不了」（不并入库存）；行结构与 res 一一对应，供时间轴并排展示两列
     const resNo = ReplenishModule.analyze(sku, params, base, { excludeOverdue: true });
     const plans = [
@@ -1074,8 +1247,8 @@ function run() {
     const badge = res.status === "充足" ? "green" : res.status === "注意" ? "orange" : "red";
     tally[res.status] = (tally[res.status] || 0) + 1;
 
-    // 默认收起，点击标题展开/收起
-    html += '<details class="sku-card">';
+    // 默认收起（状态按卡片序号记，重新分析不重置），点击标题展开/收起
+    html += '<details class="sku-card disc" id="' + ckey + '" data-ckey="' + ckey + '" data-sku="' + esc(sku.code || "") + '"' + (cardOpen[ckey] ? " open" : "") + ">";
     html += '<summary><span class="sku-title">' + esc(sku.code || "未命名") + '</span>'
       + TT('<span class="badge ' + badge + '">' + res.status + "</span>", "30 天内无断货 = 充足；距缺货 ≤ 10 天 = 紧急；10–30 天 = 注意（按含逾期口径的时间轴推算）");
     html += '<span class="sum-meta">' + esc(res.statusNote) + " ｜ 日均7天 " + sku.daily7 + " ｜ 可用 " + res.rows[0].qty + " 件"
@@ -1139,9 +1312,15 @@ function run() {
 
     for (const p of plans) {
       const tipTxt = PLAN_TIP[p.title.slice(0, 3)] || "";
-      html += '<div class="plan"><h4>' + esc(p.title)
+      const pkey = p.title.slice(0, 3);                       // 方案一 / 方案二 / 方案三
+      const pStoreKey = ckey + "|" + pkey;                   // 状态键用卡片序号（同编码两个 SKU 也各一套）
+      // 2026-09-14：方案块可点击收起，收起只留标题行（note / 风险 / 批次行都进 body）。
+      //   展开状态记在 planOpen 里（重新「分析」后会重建 DOM，靠它回填，不会被重置）。
+      html += '<details class="plan disc" data-pkey="' + esc(pkey) + '" data-ckey="' + ckey + '" data-sku="' + esc(sku.code || "") + '"'
+        + (planOpen[pStoreKey] !== false ? " open" : "") + ">";
+      html += "<summary><h4>" + esc(p.title)
         + (tipTxt ? ' <span class="tip q" data-tip="' + esc(tipTxt) + '">?</span>' : "")
-        + "</h4>";
+        + "</h4></summary>";
       html += '<div class="note">' + esc(p.note) + "</div>";
       if (p.risk) html += '<div class="note risk">' + esc(p.risk) + "</div>";
       if (p.lines.length) {
@@ -1169,23 +1348,22 @@ function run() {
         }
         html += "</ol>";
       }
-      html += "</div>";
+      html += "</details>";
     }
     html += "</div></details>";
   }
 
-  const bar = '<div class="tally-bar">共 ' + skus.length + " 个 SKU："
+  // 概况 = 结果区顶部这一句总结（导航「概况」就指到它）。
+  //   徽章之和必须等于总数：无法计算的 SKU 单列一个灰色「无法计算」，否则「共 3 个」对不上三个徽章（实测）。
+  const bar = '<div class="tally-bar" id="sec-overview">共 ' + skus.length + " 个 SKU："
     + '<span class="badge red">紧急 ' + (tally.紧急 || 0) + "</span> "
     + '<span class="badge orange">注意 ' + (tally.注意 || 0) + "</span> "
     + '<span class="badge green">充足 ' + (tally.充足 || 0) + "</span>"
-    + '<button class="copy-btn" onclick="toggleAll(true)">全部展开</button>'
-    + '<button class="copy-btn" onclick="toggleAll(false)">全部收起</button></div>';
+    + (tally.异常 ? ' <span class="badge gray">无法计算 ' + tally.异常 + "</span>" : "") + "</div>";
   out.innerHTML = bar + html;
   bindTips(out);
-}
-
-function toggleAll(open) {
-  document.querySelectorAll("#output details.sku-card").forEach(d => { d.open = open; });
+  bindDisc();          // 方案块 / SKU 卡片的开合状态回写
+  afterRender();       // 导航项 + 锚点 + 高亮（#output 刚重建）
 }
 
 function copyMd(btn) {
@@ -1223,13 +1401,22 @@ function loadSample() {
   ].join("\n");
   run();
 }
-function clearAll() { document.getElementById("input").value = ""; document.getElementById("output").innerHTML = ""; }
+function clearAll() {
+  document.getElementById("input").value = "";
+  document.getElementById("output").innerHTML = "";
+  // 状态键现在是卡片序号（sku-0…）：不清空的话，下一批数据会沿用上一批按位置记的开合状态
+  for (const k in planOpen) delete planOpen[k];
+  for (const k in cardOpen) delete cardOpen[k];
+  afterRender();
+}
 
 /* 基准日默认今天 */
 document.getElementById("p-base").value = new Date().toISOString().slice(0, 10);
 document.getElementById("p-base").addEventListener("change", renderCalcDoc);
 bindTips(document.querySelector(".params"));   // 参数 label 的浮现说明
 renderCalcDoc();
+refreshTargets();                             // 左侧导航锚点（初始只有前三个）
+requestAnimationFrame(function () { onScroll(true); });   // 等布局完成再算初始高亮（否则首屏位置读成 0）
 </script>
 </body>
 </html>
